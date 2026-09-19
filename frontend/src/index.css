@@ -18,18 +18,26 @@
 :root {
   color-scheme: dark;
 
-  --void:   #070a0d;   /* page */
-  --panel:  #10171c;   /* raised surface, and the chart surface */
-  --raised: #162027;   /* inputs, hovers */
-  --hair:   #1f2c33;   /* borders */
-  --halo:   #263640;   /* brighter border for focus and active */
+  /* Dark is the light theme's ink grown into a page, not a generic near-black:
+     the same navy that writes on paper, enlarged until it becomes the ground.
+     That is why nothing here is neutral grey. */
+  --void:   #0d1219;   /* page */
+  --panel:  #151d27;   /* raised surface, and the chart surface */
+  --raised: #1d2733;   /* inputs, hovers */
+  --hair:   #29343f;   /* borders */
+  --halo:   #3a4754;   /* brighter border for focus and active */
 
-  --text:   #e6ecea;
-  --dim:    #8fa09b;
-  --faint:  #5d6d69;
+  /* warm off-white, because the mark on an ink page is paper, not white */
+  --text:   #e8e6e0;
+  --dim:    #97a0a8;
+  --faint:  #8b959e;
 
-  --accent:      #00c79a;   /* UI accent: links, focus, glow. Not a chart colour. */
-  --accent-deep: #00ab84;
+  /* Brass. The accent marks annotations -- citation pins, focus, active nav --
+     which is what a citation is. Verification is a separate signal in green,
+     so the two are never confused. Replaces a mint teal that read as the
+     default AI-product accent. */
+  --accent:      #d6a447;
+  --accent-deep: #b8882e;
 
   --radius: 3px;
 
@@ -40,38 +48,39 @@
   --popover:             var(--panel);
   --popover-foreground:  var(--text);
   --primary:             var(--accent);
-  --primary-foreground:  #04120e;
+  --primary-foreground:  #14100a;
   --secondary:           var(--raised);
   --secondary-foreground: var(--text);
   --muted:               var(--raised);
   --muted-foreground:    var(--dim);
   --accent-bg:           var(--raised);
   --accent-foreground:   var(--text);
-  --destructive:         #f06a5e;
+  --destructive:         #ef6f61;
   --border:              var(--hair);
   --input:               var(--hair);
   --ring:                var(--accent);
 
   /* categorical: three slots, because three is the most ever shown at once */
-  --chart-1: #00ab84;
-  --chart-2: #6180e8;
-  --chart-3: #c07f14;
+  --chart-1: #00a98a;
+  --chart-2: #7086ef;
+  --chart-3: #c2861c;
 
-  /* status: reserved, always paired with a text label */
-  --good:     #00b98d;
-  --warning:  #d9a520;
-  --critical: #f06a5e;
+  /* status: reserved, always paired with a text label. "warning" is the accent
+     itself -- an attention state, not a fourth hue to keep separated. */
+  --good:     #3fb389;
+  --warning:  var(--accent);
+  --critical: #ef6f61;
+
+  --flap-chassis: linear-gradient(145deg, #0c1016 0%, #090c11 50%, #0b0f14 100%);
+  --flap-edge: rgba(255, 255, 255, .07);
+  --flap-shadow: 0 20px 60px rgba(0, 0, 0, .75), inset 0 1px 0 rgba(255, 255, 255, .05);
 
   /* activity grid: sequential, one hue light-to-dark, stepped per theme */
-  --flap-chassis: linear-gradient(145deg, #0c0c0c 0%, #080808 50%, #0a0a0a 100%);
-  --flap-edge: rgba(255, 255, 255, .06);
-  --flap-shadow: 0 20px 60px rgba(0, 0, 0, .8), inset 0 1px 0 rgba(255, 255, 255, .04);
-
-  --act-0: #131c22;
-  --act-1: #0d5744;
-  --act-2: #008866;
-  --act-3: #00ab84;
-  --act-4: #2fe0b0;
+  --act-0: #1a222c;
+  --act-1: #4a3a17;
+  --act-2: #8a6a22;
+  --act-3: #b8882e;
+  --act-4: #e0b25a;
 }
 
 /* ── light ───────────────────────────────────────────────────────────────
@@ -79,43 +88,47 @@
    light set (checked against the board surface); reusing the dark hues here
    would drop below the contrast floor. Three slots in both themes. */
 
+/* ── light ───────────────────────────────────────────────────────────────
+   Warm bond paper rather than a cool grey. A separate validated palette, not
+   an inversion: the chart hues are the light set, checked against the light
+   panel, because the dark hues drop below the contrast floor here. */
+
 :root[data-theme='light'] {
   color-scheme: light;
 
-  --void:   #f2f4f3;
-  --panel:  #fbfcfb;
-  --raised: #eaeeec;
-  --hair:   #d3d9d7;
-  --halo:   #b4c0bc;
+  --void:   #f5f3ef;
+  --panel:  #fffdf9;
+  --raised: #eae6dd;
+  --hair:   #dcd6cb;
+  --halo:   #bdb5a6;
 
-  --text:   #16202b;
-  --dim:    #55635f;
-  --faint:  #7c8a86;
+  --text:   #1a2233;
+  --dim:    #5b5750;
+  --faint:  #6a655d;
 
-  --accent:      #00806a;
-  --accent-deep: #006b58;
+  --accent:      #835c10;
+  --accent-deep: #6a4a0c;
 
-  --primary-foreground: #ffffff;
-  --destructive: #c02a24;
+  --primary-foreground: #fffdf9;
+  --destructive: #b23a2e;
 
-  --chart-1: #00997c;
-  --chart-2: #3a5ae0;
-  --chart-3: #b8730c;
+  --chart-1: #00806a;
+  --chart-2: #3f5ddd;
+  --chart-3: #9d6412;
 
-  --good:     #00806a;
-  --warning:  #a87f00;
-  --critical: #c02a24;
+  --good:     #00755f;
+  --warning:  var(--accent);
+  --critical: #b23a2e;
 
-  --flap-chassis: linear-gradient(145deg, #2b3339 0%, #202730 50%, #262e34 100%);
-  --flap-edge: rgba(0, 0, 0, .18);
-  --flap-shadow: 0 10px 28px -14px rgba(22, 32, 43, .5), inset 0 1px 0 rgba(255, 255, 255, .07);
+  --flap-chassis: linear-gradient(145deg, #2f3542 0%, #242a36 50%, #2a303c 100%);
+  --flap-edge: rgba(0, 0, 0, .2);
+  --flap-shadow: 0 10px 28px -14px rgba(26, 34, 51, .5), inset 0 1px 0 rgba(255, 255, 255, .08);
 
-  /* empty cells need to read as cells, not as background, on a light ground */
-  --act-0: #dbe2df;
-  --act-1: #a8ddcd;
-  --act-2: #5cbfa2;
-  --act-3: #1c9a79;
-  --act-4: #00705c;
+  --act-0: #e7e2d8;
+  --act-1: #dcc99a;
+  --act-2: #c7a558;
+  --act-3: #a67c1e;
+  --act-4: #7a5610;
 }
 
 @theme inline {

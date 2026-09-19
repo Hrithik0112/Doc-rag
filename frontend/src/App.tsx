@@ -99,9 +99,9 @@ export default function App() {
       <div className="pointer-events-none fixed inset-0 -z-10" aria-hidden>
         <GrainGradient
           key={theme}
-          colorDark={theme === 'dark' ? '#070a0d' : '#e2e9e6'}
-          colorMid={theme === 'dark' ? '#0d2b2a' : '#c9ded6'}
-          colorLight={theme === 'dark' ? '#00c79a' : '#7fd3bb'}
+          colorDark={theme === 'dark' ? '#0d1219' : '#efeae0'}
+          colorMid={theme === 'dark' ? '#2a2414' : '#e0d5bd'}
+          colorLight={theme === 'dark' ? '#d6a447' : '#c9a463'}
           angle={118}
           softness={0.85}
           grain={theme === 'dark' ? 0.32 : 0.18}

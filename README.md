@@ -186,26 +186,35 @@ documents full of identifiers, part numbers and dates.
 
 ## Colour
 
-Two validated palettes, and the dark one is not the light one inverted. Each was stepped
-against its own surface and checked at every pair for lightness band, chroma floor,
-colour-vision separation and contrast.
+The visual idea is a document that has been worked on. Light is **warm bond paper**;
+dark is **the light theme's ink grown into a page**, a deep navy rather than a neutral
+black, so neither mode is a generic grey.
 
-| | Chart hues | Surface |
-|---|---|---|
-| Dark | `#00ab84` `#6180e8` `#c07f14` | `#10171c` |
-| Light | `#00997c` `#3a5ae0` `#b8730c` | `#fbfcfb` |
+The accent is **brass**, and it marks annotation: citation pins, focus, active
+navigation, the progress bar. That is what a citation is. Verification is a separate
+signal in green, so a mark and a judgement are never confused. It replaces a mint teal
+that read as the default AI-product accent.
 
-Dark was the one that needed real work. The intuitive version, take the light hues and
-brighten them, failed outright: it put blue and violet at delta-E 0.2 for protanopes,
-which is to say the same colour.
+|  | Ground | Ink | Accent | Chart hues |
+|---|---|---|---|---|
+| Dark | `#0d1219` | `#e8e6e0` | `#d6a447` | `#00a98a` `#7086ef` `#c2861c` |
+| Light | `#f5f3ef` | `#1a2233` | `#835c10` | `#00806a` `#3f5ddd` `#9d6412` |
 
-Three slots in both themes, not four, because three is the most ever shown at once. Do
-not swap one without re-validating the whole set. Recharts takes colours as props rather
-than CSS variables, so `lib/chart.ts` re-derives the whole config when the theme flips.
+Two validated palettes, not one inverted. Each chart set was stepped against its own
+panel surface and checked at every pair for lightness band, chroma floor, colour-vision
+separation and contrast. Every text colour clears 4.5:1 against every ground it can sit
+on, checked separately, because the categorical validator does not cover text.
 
-Glow is a dark-mode device; on a light ground it becomes haze, so `.glow-text` and
-`.glow-ring` fall back to a plain hairline. Status colours are reserved and always ship
-with a text label, never colour alone.
+Three chart slots in both themes, not four, because three is the most ever shown at
+once. `warning` is the accent itself rather than a fourth hue, since it marks an
+attention state rather than a category. Do not swap one without re-validating the set.
+
+Recharts takes colours as props rather than CSS variables, so `lib/chart.ts` re-derives
+the whole config when the theme flips. Glow is a dark-mode device; on a light ground it
+becomes haze, so `.glow-text` and `.glow-ring` fall back to a plain hairline.
+
+Status is never colour alone: every badge carries a label, and the lead figure spells
+out its ratio in words beneath the number.
 
 ## Cost of the redesign
 

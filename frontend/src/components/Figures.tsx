@@ -37,10 +37,10 @@ export function Figure({
   const { theme } = useTheme()
   const { STATUS } = chartTheme(theme)
   const accent = {
-    text: theme === 'dark' ? '#e6ecea' : '#16202b',
+    text: theme === 'dark' ? '#e8e6e0' : '#1a2233',
     good: STATUS.good,
     critical: STATUS.critical,
-    dim: theme === 'dark' ? '#8fa09b' : '#55635f',
+    dim: theme === 'dark' ? '#97a0a8' : '#5b5750',
   }[tone]
 
   return (
@@ -62,7 +62,9 @@ export function Figure({
             columns={value.length}
             size="md"
             accentColor={accent}
-            showIndicators={false}
+            // the indicator strip is the only place accentColor lands, so it is
+            // what carries good-vs-critical on the lead figure
+            showIndicators
             flipSpeed={34}
             staggerDelay={60}
             className="!rounded-md !p-2"
@@ -74,7 +76,12 @@ export function Figure({
         </p>
       )}
 
-      {note && <p className="mt-2 text-xs leading-snug text-faint">{note}</p>}
+      {/* tone is never colour alone: the note spells out the ratio in words */}
+      {note && (
+        <p className={`mt-2 text-xs leading-snug ${lead && tone !== 'text' ? TONE[tone] : 'text-faint'}`}>
+          {note}
+        </p>
+      )}
     </div>
   )
 }
