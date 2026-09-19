@@ -127,3 +127,8 @@ ALTER TABLE documents ADD COLUMN IF NOT EXISTS chunk_ms     INT NOT NULL DEFAULT
 ALTER TABLE documents ADD COLUMN IF NOT EXISTS embed_retries INT NOT NULL DEFAULT 0;
 ALTER TABLE documents ADD COLUMN IF NOT EXISTS throttle_ms  INT NOT NULL DEFAULT 0;
 ALTER TABLE documents ADD COLUMN IF NOT EXISTS est_cost_usd NUMERIC(12,8) NOT NULL DEFAULT 0;
+
+-- A restart kills the in-process ingestion task, leaving the row in
+-- 'processing' with nothing able to move it. It needs its own bucket so the
+-- dashboard does not count a lost task as a genuine failure.
+ALTER TYPE error_kind ADD VALUE IF NOT EXISTS 'interrupted';

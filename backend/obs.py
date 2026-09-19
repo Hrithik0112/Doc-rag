@@ -26,9 +26,11 @@ TIMEOUT = "timeout"
 NO_TEXT = "no_extractable_text"  # scanned PDF, needs OCR we do not have
 BAD_INPUT = "bad_input"
 DB = "database"
+INTERRUPTED = "interrupted"  # in-flight work lost to a restart
 UNKNOWN = "unknown"
 
-ERROR_KINDS = (QUOTA_DAY, QUOTA_MINUTE, UPSTREAM, TIMEOUT, NO_TEXT, BAD_INPUT, DB, UNKNOWN)
+ERROR_KINDS = (QUOTA_DAY, QUOTA_MINUTE, UPSTREAM, TIMEOUT, NO_TEXT,
+               BAD_INPUT, DB, INTERRUPTED, UNKNOWN)
 
 
 def classify(exc: BaseException) -> str:
@@ -185,6 +187,7 @@ def _self_check():
                             (Fake, Fake("503 UNAVAILABLE"), None))
     parsed = json.loads(JsonFormatter().format(rec))
     assert parsed["error_kind"] == UPSTREAM and parsed["request_id"] == rid
+    assert INTERRUPTED in ERROR_KINDS
     print(f"ok  obs: {len(ERROR_KINDS)} error kinds, cost + span + json log with request_id")
 
 

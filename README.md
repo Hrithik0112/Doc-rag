@@ -60,6 +60,12 @@ panel reads "what this traffic would cost".
 endpoint on every span, so it stays off and the in-process spans still drive the
 histograms.
 
+**Recovery.** Ingestion runs in an in-process background task, so a restart abandons
+anything mid-flight: the row stays `processing` and nothing can move it, leaving a
+progress bar that never finishes. Startup reconciles those rows to `failed` with the
+`interrupted` bucket, which hands them to the existing resume path. They are not
+auto-restarted, because a crash loop would then re-embed the same document every boot.
+
 **Health.** `GET /api/health` checks the database and the quota gauge and returns 503 when
 either is unhappy. A health check that cannot fail tells you nothing.
 
@@ -207,6 +213,7 @@ Each module carries one runnable check. No test framework.
 ./.venv/bin/python -m backend.retrieval   # proves hybrid: exact string AND paraphrase
 ./.venv/bin/python -m backend.stats       # arm buckets, AND all 6 dashboard reads execute
 ./.venv/bin/python -m backend.obs         # error taxonomy, cost, spans, JSON log
+./.venv/bin/python -m backend.ratelimit   # window enforced, idle keys reclaimed
 ```
 
 `backend.stats` runs every dashboard query against Postgres. Its earlier version only
