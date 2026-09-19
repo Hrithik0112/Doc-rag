@@ -66,7 +66,9 @@ export function Answer({
         <sup
           key={`${m.index}-${j}`}
           className={`px-[.1em] align-[.35em] font-sans text-[11px] font-medium ${
-            n === null ? 'text-oxide' : 'text-trace'
+            n === null
+              ? 'text-critical'
+              : 'text-glow [text-shadow:0_0_10px_color-mix(in_oklab,currentColor_55%,transparent)]'
           }`}
           title={n === null ? `${label} is not among the retrieved passages` : label}
         >
@@ -78,12 +80,12 @@ export function Answer({
   nodes.push(text.slice(last))
 
   return (
-    <div className="whitespace-pre-wrap font-serif text-[17px] leading-[1.68]">
+    <div className="whitespace-pre-wrap font-serif text-[17px] leading-[1.72] text-text/95">
       {nodes}
       {streaming && (
         <span
           aria-label="Writing"
-          className="ml-[.06em] inline-block h-[1.05em] w-[.5em] animate-[blink_1.1s_steps(1,end)_infinite] align-[-.16em] bg-trace"
+          className="ml-[.06em] inline-block h-[1.05em] w-[.5em] animate-[blink_1.1s_steps(1,end)_infinite] align-[-.16em] bg-glow shadow-[0_0_12px_var(--accent)]"
         />
       )}
     </div>

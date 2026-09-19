@@ -51,6 +51,42 @@ The log stores question text, retrieved page numbers and scores, but never passa
 contents. It has no retention policy, which is fine for a local single-user app and
 would need one before this ran for anyone else.
 
+## Interface
+
+Dark, with an ambient grain field behind the work and glass panels over it. Two screens,
+`#ask` and `#instrumentation`, reached from a magnetic dock.
+
+Motion is rationed. The one mechanical moment is the lead figure on the dashboard, which
+flips like a departure board; everything else stays still so that movement keeps its
+meaning. `prefers-reduced-motion` is respected throughout.
+
+Several pieces come from the [Componentry](https://componentry.dev) registry, wired in as
+a shadcn registry in `frontend/components.json`:
+
+| Component | Used for |
+|---|---|
+| `split-flap-display` | the grounding rate, the number that matters most |
+| `github-calendar` | daily question activity |
+| `magnetic-dock` | navigation |
+| `grain-gradient` | the ambient field |
+| `kinetic-text-reveal` | the wordmark |
+
+`github-calendar` is adapted. It shipped fetching a GitHub username from a third-party
+API; this app has its own activity to show and should not be making external calls, so it
+takes the days directly and buckets them locally. Its window grows from twelve weeks
+toward a year as history accumulates, because a full-year grid with one active day is
+mostly dead space and padding it with invented history would be worse.
+
+To pull more components:
+
+```bash
+cd frontend && npx shadcn@latest add @componentry/<name>
+```
+
+`.mcp.json` registers the shadcn MCP server pointed at `frontend/`, so a future session can
+browse and add from the registry directly. MCP servers load at session start, so it takes
+effect on the next one.
+
 ## Running it
 
 Requires Docker, Python 3.11+, Node 20+, and a Gemini API key from
@@ -133,6 +169,27 @@ Answer quality (hybrid retrieval, graded by Gemini)
 The hybrid delta is one question, not a landslide. These are mostly
 paraphrase-friendly questions about two well-written papers; the gap widens on
 documents full of identifiers, part numbers and dates.
+
+## Colour
+
+There are two validated palettes in this repo's history, and the dark one is not a
+brightened copy of the light one. Dark mode was stepped separately and re-validated,
+because the intuitive version failed: the "obviously brighter" candidate put blue and
+violet at delta-E 0.2 for protanopes, which is to say the same colour.
+
+The shipped dark set is three hues, `#00ab84 #6180e8 #c07f14`, checked at every pair
+against the panel surface for lightness band, chroma floor, colour-vision separation and
+contrast. Three, not four, because three is the most ever shown at once. Do not swap one
+without re-validating the whole set.
+
+Status colours are reserved and always ship with a text label, never colour alone.
+
+## Cost of the redesign
+
+The bundle went from 72kB gzipped to 253kB. `recharts` and `framer-motion` account for
+almost all of it. That is a real trade for the motion and the charts; if it ever matters,
+the dashboard is the natural code-split boundary since the chat screen needs neither
+library.
 
 ## What the dashboard has already shown
 
