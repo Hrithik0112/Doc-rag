@@ -10,6 +10,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from . import obs
 from .config import CHAT_MODEL, EMBED_MODEL
 from .db import close, pool
+from .ingest import reconcile_interrupted
 from .routes import router
 
 _log = obs.log("papertrail.http")
@@ -43,7 +44,9 @@ async def lifespan(app: FastAPI):
     obs.setup_logging()
     _tracing(app)
     await pool()
-    obs.event(_log, logging.INFO, "ready", embed_model=EMBED_MODEL, chat_model=CHAT_MODEL)
+    stranded = await reconcile_interrupted()
+    obs.event(_log, logging.INFO, "ready", embed_model=EMBED_MODEL,
+              chat_model=CHAT_MODEL, recovered_documents=stranded)
     yield
     await close()
 

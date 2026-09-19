@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { Chat } from './screens/Chat'
 import { Dashboard } from './screens/Dashboard'
 import { Landing } from './screens/Landing'
@@ -83,7 +84,10 @@ export default function App() {
       </header>
 
       <main className="flex min-h-0 flex-1 flex-col">
-        {screen === 'home' ? <Landing /> : screen === 'ask' ? <Chat /> : <Dashboard />}
+        {/* keyed by screen so navigating away from a broken one clears the error */}
+        <ErrorBoundary key={screen}>
+          {screen === 'home' ? <Landing /> : screen === 'ask' ? <Chat /> : <Dashboard />}
+        </ErrorBoundary>
       </main>
     </div>
   )

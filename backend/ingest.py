@@ -83,6 +83,30 @@ async def create_document(filename: str, pdf_bytes: bytes) -> str:
     return str(doc_id)
 
 
+async def reconcile_interrupted() -> int:
+    """Ingestion runs in an in-process background task, so a restart abandons
+    anything mid-flight: the row stays 'processing' and nothing can ever move
+    it, leaving a progress bar that never finishes and no way out.
+
+    Runs at startup and hands those rows to the existing resume path rather
+    than auto-restarting them, because a crash loop would otherwise re-embed
+    the same document on every boot."""
+    p = await pool()
+    async with p.acquire() as conn:
+        rows = await conn.fetch(
+            """UPDATE documents SET status='failed', error_kind='interrupted',
+                      error='Indexing stopped when the server restarted. '
+                            'Resume to continue; finished passages are kept.'
+               WHERE status IN ('processing','pending')
+               RETURNING id, filename, n_embedded, n_chunks"""
+        )
+    for r in rows:
+        obs.event(_log, logging.WARNING, "recovered interrupted ingestion",
+                  document_id=str(r["id"]), filename=r["filename"],
+                  embedded=r["n_embedded"], of=r["n_chunks"])
+    return len(rows)
+
+
 async def embed_pending(doc_id: str):
     """Embed every chunk of a document that has no embedding yet. Safe to call
     repeatedly; each call picks up exactly where the last one stopped."""
