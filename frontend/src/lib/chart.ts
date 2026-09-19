@@ -1,49 +1,53 @@
-/** Shared chart configuration.
+/** Shared chart configuration, dark mode.
  *
- * The categorical colours below are a validated set: every pair clears the
- * colour-vision-deficiency and normal-vision separation floors against the
- * board surface. Swapping one without re-validating the whole set is how a
- * palette quietly becomes unreadable, so treat these as fixed and assign them
- * in order rather than cycling. */
+ * These are a SEPARATE validated set from the light palette, not a brightened
+ * flip of it. Stepped against the panel surface and checked at every pair for
+ * colour-vision separation. The intuitive "just make them brighter" candidate
+ * failed outright: blue and violet came out at delta-E 0.2 for protanopes,
+ * i.e. the same colour. Three slots, because three is the most ever shown at
+ * once. Do not swap one without re-validating the whole set. */
 
-export const CHART = ['#00997c', '#3a5ae0', '#b8730c', '#8e3a99'] as const
-export const STATUS = { good: '#00806a', warning: '#a87f00', critical: '#c02a24' } as const
+export const CHART = ['#00ab84', '#6180e8', '#c07f14'] as const
+export const STATUS = { good: '#00b98d', warning: '#d9a520', critical: '#f06a5e' } as const
 
-export const INK = '#16202b'
-export const QUIET = '#6b7975'
-export const RULE = '#d3d9d7'
-export const SURFACE = '#fbfcfb'
+export const TEXT = '#e6ecea'
+export const DIM = '#8fa09b'
+export const HAIR = '#1f2c33'
+export const SURFACE = '#10171c'
+export const ACCENT = '#00c79a'
 
-/** Recessive axes and grid: the data carries the emphasis, not the furniture. */
+/** Recessive axes and grid: on dark, furniture needs to be quieter still or it
+ *  reads as data. */
 export const axis = {
-  stroke: RULE,
-  tick: { fill: QUIET, fontSize: 11 },
+  stroke: HAIR,
+  tick: { fill: DIM, fontSize: 11 },
   tickLine: false,
-  axisLine: { stroke: RULE },
+  axisLine: { stroke: HAIR },
 } as const
 
 export const grid = {
-  stroke: RULE,
-  strokeDasharray: '2 4',
+  stroke: HAIR,
+  strokeDasharray: '2 5',
   vertical: false,
 } as const
 
 export const tooltipStyle = {
   contentStyle: {
-    background: SURFACE,
-    border: `1px solid ${RULE}`,
-    borderRadius: 2,
+    background: 'rgba(16,23,28,.94)',
+    border: `1px solid ${HAIR}`,
+    borderRadius: 6,
     fontSize: 12,
     padding: '8px 10px',
-    boxShadow: 'none',
+    backdropFilter: 'blur(10px)',
+    boxShadow: '0 12px 40px -12px rgba(0,0,0,.8)',
   },
-  labelStyle: { color: INK, fontWeight: 500, marginBottom: 4 },
-  itemStyle: { color: QUIET, padding: 0 },
-  cursor: { stroke: RULE, strokeWidth: 1 },
+  labelStyle: { color: TEXT, fontWeight: 500, marginBottom: 4 },
+  itemStyle: { color: DIM, padding: 0 },
+  cursor: { stroke: HAIR, strokeWidth: 1 },
 } as const
 
-/** 2px strokes, 8px active dots -- the minimum that stays visible on a
- *  hairline-ruled surface without shouting. */
+/** 2px strokes, 8px active dots. The surface ring keeps a marker readable where
+ *  it lands on top of its own line. */
 export const line = {
   strokeWidth: 2,
   dot: false,

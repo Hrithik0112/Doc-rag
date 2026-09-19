@@ -1,52 +1,59 @@
 @import 'tailwindcss';
 
 /* ── design tokens ───────────────────────────────────────────────────────
-   shadcn's token contract, filled with PaperTrail's archival palette rather
-   than the default neutral ramp. Chart colours are the validated set: every
-   adjacent and non-adjacent pair clears the CVD and normal-vision floors
-   against the board surface. Do not swap one without re-validating the set. */
+   Dark-first. The archival identity survives in the type and the hairlines;
+   the surfaces and the accent are new.
+
+   Chart colours are a SEPARATE validated set from the light palette, not a
+   brightened flip of it. Stepped against the panel surface (#10171c) and
+   checked for colour-vision separation at every pair. The obvious "just make
+   them brighter" set failed: blue and violet came out near-identical for
+   protanopes. Do not swap one without re-validating the whole set. */
 
 :root {
-  --ink:    #16202b;
-  --board:  #f2f4f3;
-  --paper:  #fbfcfb;
-  --rule:   #d3d9d7;
-  --quiet:  #6b7975;
-  --trace:  #2f6f62;
-  --oxide:  #a8322d;
+  --void:   #070a0d;   /* page */
+  --panel:  #10171c;   /* raised surface, and the chart surface */
+  --raised: #162027;   /* inputs, hovers */
+  --hair:   #1f2c33;   /* borders */
+  --halo:   #263640;   /* brighter border for focus and active */
 
-  --radius: 2px;
+  --text:   #e6ecea;
+  --dim:    #8fa09b;
+  --faint:  #5d6d69;
 
-  --background:          var(--board);
-  --foreground:          var(--ink);
-  --card:                var(--paper);
-  --card-foreground:     var(--ink);
-  --popover:             var(--paper);
-  --popover-foreground:  var(--ink);
-  --primary:             var(--ink);
-  --primary-foreground:  var(--board);
-  --secondary:           #e7eae9;
-  --secondary-foreground: var(--ink);
-  --muted:               #e7eae9;
-  --muted-foreground:    var(--quiet);
-  --accent:              #e2e8e6;
-  --accent-foreground:   var(--ink);
-  --destructive:         #c02a24;
-  --destructive-foreground: #ffffff;
-  --border:              var(--rule);
-  --input:               var(--rule);
-  --ring:                var(--trace);
+  --accent:      #00c79a;   /* UI accent: links, focus, glow. Not a chart colour. */
+  --accent-deep: #00ab84;
 
-  /* categorical: identity, assigned in fixed order and never cycled */
-  --chart-1: #00997c;
-  --chart-2: #3a5ae0;
-  --chart-3: #b8730c;
-  --chart-4: #8e3a99;
+  --radius: 3px;
 
-  /* status: reserved, always shipped with a label, never used as "series 5" */
-  --good:    #00806a;
-  --warning: #a87f00;
-  --critical: #c02a24;
+  --background:          var(--void);
+  --foreground:          var(--text);
+  --card:                var(--panel);
+  --card-foreground:     var(--text);
+  --popover:             var(--panel);
+  --popover-foreground:  var(--text);
+  --primary:             var(--accent);
+  --primary-foreground:  #04120e;
+  --secondary:           var(--raised);
+  --secondary-foreground: var(--text);
+  --muted:               var(--raised);
+  --muted-foreground:    var(--dim);
+  --accent-bg:           var(--raised);
+  --accent-foreground:   var(--text);
+  --destructive:         #f06a5e;
+  --border:              var(--hair);
+  --input:               var(--hair);
+  --ring:                var(--accent);
+
+  /* categorical: three slots, because three is the most ever shown at once */
+  --chart-1: #00ab84;
+  --chart-2: #6180e8;
+  --chart-3: #c07f14;
+
+  /* status: reserved, always paired with a text label */
+  --good:     #00b98d;
+  --warning:  #d9a520;
+  --critical: #f06a5e;
 }
 
 @theme inline {
@@ -62,20 +69,22 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
+  --color-accent: var(--accent-bg);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  --color-ink: var(--ink);
-  --color-board: var(--board);
-  --color-paper: var(--paper);
-  --color-rule: var(--rule);
-  --color-quiet: var(--quiet);
-  --color-trace: var(--trace);
-  --color-oxide: var(--oxide);
+  --color-void: var(--void);
+  --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-hair: var(--hair);
+  --color-halo: var(--halo);
+  --color-text: var(--text);
+  --color-dim: var(--dim);
+  --color-faint: var(--faint);
+  --color-glow: var(--accent);
   --color-good: var(--good);
   --color-warning: var(--warning);
   --color-critical: var(--critical);
@@ -83,14 +92,14 @@
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
 
   --font-serif: 'Newsreader', Georgia, serif;
   --font-sans: 'Archivo', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
-  --radius-sm: 2px;
-  --radius-md: 2px;
-  --radius-lg: 3px;
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
 }
 
 @layer base {
@@ -99,21 +108,58 @@
   body {
     @apply bg-background text-foreground font-sans;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   html, body, #root { height: 100%; }
   #root { display: flex; }
 
-  /* numbers in a ledger line up */
+  ::selection { background: color-mix(in oklab, var(--accent) 30%, transparent); }
+
   .tabular { font-variant-numeric: tabular-nums; }
 
   :focus-visible { @apply outline-2 outline-offset-2 outline-ring; }
 
+  /* scrollbars that belong to the surface rather than the OS */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--hair);
+    border: 3px solid var(--void);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: var(--halo); }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation-duration: .01ms !important;
+      animation-iteration-count: 1 !important;
       transition-duration: .01ms !important;
     }
+  }
+}
+
+@layer components {
+  /* One glass recipe, used deliberately. Panels that hold dense numbers get
+     the flat variant instead, because blur under small text costs legibility. */
+  .glass {
+    background: color-mix(in oklab, var(--panel) 72%, transparent);
+    backdrop-filter: blur(14px) saturate(120%);
+    border: 1px solid var(--hair);
+  }
+
+  .glow-text { text-shadow: 0 0 28px color-mix(in oklab, currentColor 45%, transparent); }
+
+  .glow-ring {
+    box-shadow:
+      0 0 0 1px var(--hair),
+      0 0 34px -12px color-mix(in oklab, var(--accent) 60%, transparent);
+  }
+
+  /* hairline that fades at both ends, for section breaks */
+  .rule-fade {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--hair) 18%, var(--hair) 82%, transparent);
   }
 }
 

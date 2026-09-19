@@ -3,6 +3,7 @@ import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
+import { GithubCalendar } from '@/components/ui/github-calendar'
 import {
   getEvalRuns, getOverview, getRecentQueries, getScoreBuckets, getTimeseries,
   type DayPoint, type EvalRun, type Overview, type QueryRow, type ScoreBucket,
@@ -42,7 +43,7 @@ export function Dashboard() {
     let alive = true
     const load = () =>
       Promise.all([
-        getOverview(), getTimeseries(14), getScoreBuckets(), getRecentQueries(25), getEvalRuns(),
+        getOverview(), getTimeseries(364), getScoreBuckets(), getRecentQueries(25), getEvalRuns(),
       ])
         .then(([overview, series, buckets, queries, evals]) => {
           if (alive) { setData({ overview, series, buckets, queries, evals }); setError(null) }
@@ -54,13 +55,27 @@ export function Dashboard() {
   }, [])
 
   if (error) {
-    return <p className="p-8 text-sm text-oxide">{error}</p>
+    return <p className="p-8 text-sm text-critical">{error}</p>
   }
   if (!data) {
-    return <p className="p-8 text-sm text-quiet">Reading the query log…</p>
+    return (
+      <div className="flex flex-1 items-center justify-center gap-3 text-sm text-faint">
+        <span className="size-1.5 animate-ping rounded-full bg-glow" aria-hidden />
+        Reading the query log…
+      </div>
+    )
   }
 
   const { overview: o, series, buckets, queries, evals } = data
+  const recent = series.slice(-14)
+  // Window the grid to the data. A full year with one active day is mostly dead
+  // space; padding it with invented history would be worse. Starts 12 weeks back
+  // at minimum and grows to a year as real history accumulates.
+  const firstActive = series.findIndex((d) => d.queries > 0)
+  const span = firstActive === -1 ? 84 : Math.min(364, Math.max(84, series.length - firstActive + 21))
+  const activity = series
+    .slice(-span)
+    .map((d) => ({ date: String(d.day).slice(0, 10), count: d.queries }))
 
   const genTokens = o.prompt_tokens + o.completion_tokens
   const failed = o.queries_quota + o.queries_error + o.queries_no_hits
@@ -81,9 +96,9 @@ export function Dashboard() {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto max-w-6xl px-8 py-8 max-lg:px-5">
-        <header className="mb-6">
-          <h1 className="font-serif text-3xl font-medium tracking-tight">Instrumentation</h1>
-          <p className="mt-1 text-sm text-quiet">
+        <header className="mb-7">
+          <h1 className="font-serif text-4xl font-medium tracking-tight text-text">Instrumentation</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-dim">
             Measured from the query log, not sampled or simulated. Embedding a passage returns
             no usage metadata, so embedding token counts are local estimates and are labelled
             as such.
@@ -96,6 +111,7 @@ export function Dashboard() {
             lead
             label="Answers fully grounded"
             value={pctLabel(o.queries_clean, o.queries_cited)}
+            flip
             tone={o.queries_cited && o.queries_clean < o.queries_cited ? 'critical' : 'good'}
             note={
               o.queries_cited
@@ -116,66 +132,61 @@ export function Dashboard() {
           <Figure
             label="Failure rate"
             value={pctLabel(failed, o.queries, '0%')}
-            tone={failed ? 'critical' : 'quiet'}
+            tone={failed ? 'critical' : 'dim'}
             note={`${o.queries_quota} quota, ${o.queries_error} error, ${o.queries_no_hits} found nothing`}
           />
         </Band>
 
-        {/* ── usage over time. two measures of different scale, so two
-               charts rather than one with two y-axes ─────────────────── */}
-        <div className="mt-8 grid grid-cols-2 gap-5 max-lg:grid-cols-1">
-          <Card>
+        {/* ── usage. A year of daily counts reads better as a grid than as a
+               line that is flat for 350 days; tokens keep a chart because the
+               magnitude, not the rhythm, is the point. Two measures of
+               different scale get two panels, never two y-axes. ─────────── */}
+        <div className="mt-6 grid grid-cols-[minmax(0,1fr)_26rem] gap-5 max-xl:grid-cols-1">
+          <Card className="min-w-0">
             <CardHeader>
-              <CardTitle className="font-serif text-base font-medium">Questions per day</CardTitle>
-              <CardDescription className="text-xs text-quiet">
-                Last 14 days, including days with none
+              <CardTitle className="font-serif text-base font-medium">Question activity</CardTitle>
+              <CardDescription className="text-xs text-faint">
+                One cell per day. Shade is the count, bucketed against active days only.
+                The window grows toward a year as history accumulates.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="overflow-x-auto">
               {o.queries === 0 ? (
                 <Empty>Ask something and it appears here.</Empty>
               ) : (
-                <ResponsiveContainer width="100%" height={180}>
-                  <AreaChart data={series} margin={{ top: 4, right: 4, bottom: 0, left: -18 }}>
-                    <defs>
-                      <linearGradient id="qfill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={CHART[0]} stopOpacity={0.22} />
-                        <stop offset="100%" stopColor={CHART[0]} stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid {...grid} />
-                    <XAxis dataKey="day" tickFormatter={day} {...axis} minTickGap={24} />
-                    <YAxis allowDecimals={false} {...axis} width={40} />
-                    <Tooltip {...tooltipStyle} labelFormatter={(v) => day(String(v))} />
-                    <Area type="monotone" dataKey="queries" name="Questions"
-                          stroke={CHART[0]} fill="url(#qfill)" {...line} />
-                  </AreaChart>
-                </ResponsiveContainer>
+                <GithubCalendar
+                  days={activity}
+                  label="Questions asked"
+                  unit="questions"
+                  variant="city-lights"
+                  shape="rounded"
+                  glowIntensity={7}
+                />
               )}
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="min-w-0">
             <CardHeader>
-              <CardTitle className="font-serif text-base font-medium">Generation tokens per day</CardTitle>
-              <CardDescription className="text-xs text-quiet">
-                Prompt plus completion, as reported by Gemini
+              <CardTitle className="font-serif text-base font-medium">Generation tokens</CardTitle>
+              <CardDescription className="text-xs text-faint">
+                Last 14 days, prompt plus completion as reported by Gemini
               </CardDescription>
             </CardHeader>
             <CardContent>
               {genTokens === 0 ? (
                 <Empty>No generation yet.</Empty>
               ) : (
-                <ResponsiveContainer width="100%" height={180}>
-                  <AreaChart data={series} margin={{ top: 4, right: 4, bottom: 0, left: -6 }}>
+                <ResponsiveContainer width="100%" height={186}>
+                  <AreaChart data={recent} margin={{ top: 4, right: 4, bottom: 0, left: -6 }}>
                     <defs>
                       <linearGradient id="tfill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={CHART[1]} stopOpacity={0.22} />
+                        <stop offset="0%" stopColor={CHART[1]} stopOpacity={0.4} />
                         <stop offset="100%" stopColor={CHART[1]} stopOpacity={0.02} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid {...grid} />
-                    <XAxis dataKey="day" tickFormatter={day} {...axis} minTickGap={24} />
+                    <XAxis dataKey="day" tickFormatter={day} {...axis} minTickGap={28} />
                     <YAxis tickFormatter={compact} {...axis} width={48} />
                     <Tooltip {...tooltipStyle} labelFormatter={(v) => day(String(v))}
                              formatter={(v) => [Number(v ?? 0).toLocaleString(), 'Tokens']} />
@@ -195,7 +206,7 @@ export function Dashboard() {
               <CardTitle className="font-serif text-base font-medium">
                 Top-hit fusion score
               </CardTitle>
-              <CardDescription className="text-xs text-quiet">
+              <CardDescription className="text-xs text-faint">
                 A pile-up in the two leftmost bars means retrieval is scraping. That shows here
                 before the answers start going wrong.
               </CardDescription>
@@ -228,7 +239,7 @@ export function Dashboard() {
               <CardTitle className="font-serif text-base font-medium">
                 Which arm found it
               </CardTitle>
-              <CardDescription className="text-xs text-quiet">
+              <CardDescription className="text-xs text-faint">
                 Across every retrieved passage. Keyword-only hits are the ones vector search
                 would have missed.
               </CardDescription>
@@ -268,7 +279,7 @@ export function Dashboard() {
           <Card>
             <CardHeader>
               <CardTitle className="font-serif text-base font-medium">Latency</CardTitle>
-              <CardDescription className="text-xs text-quiet">
+              <CardDescription className="text-xs text-faint">
                 Median and 95th percentile, answered questions only
               </CardDescription>
             </CardHeader>
@@ -281,7 +292,7 @@ export function Dashboard() {
                   ['Generation, p95', ms(o.generation_ms_p95)],
                 ]}
               />
-              <p className="mt-3 text-xs leading-snug text-quiet">
+              <p className="mt-3 text-xs leading-snug text-faint">
                 Retrieval includes one embedding round trip for the question, which is
                 throttled to stay inside the free-tier rate limit.
               </p>
@@ -310,7 +321,7 @@ export function Dashboard() {
         <Card className="mt-5">
           <CardHeader>
             <CardTitle className="font-serif text-base font-medium">Evaluation runs</CardTitle>
-            <CardDescription className="text-xs text-quiet">
+            <CardDescription className="text-xs text-faint">
               Recall at 5 against gold page labels, hybrid retrieval versus the vector-only
               baseline. Run <code className="font-mono">python -m backend.eval.run_eval</code> to
               add a point.
@@ -336,7 +347,7 @@ export function Dashboard() {
               </ResponsiveContainer>
             )}
             {evals.length > 1 && latest && (
-              <p className="mt-3 text-xs text-quiet">
+              <p className="mt-3 text-xs text-faint">
                 Latest: {latest.recall_hybrid}/{latest.n_questions} hybrid versus{' '}
                 {latest.recall_vector}/{latest.n_questions} vector only, {stamp(latest.created_at)}.
               </p>
@@ -348,7 +359,7 @@ export function Dashboard() {
         <Card className="mt-5">
           <CardHeader>
             <CardTitle className="font-serif text-base font-medium">Recent questions</CardTitle>
-            <CardDescription className="text-xs text-quiet">
+            <CardDescription className="text-xs text-faint">
               Newest first. A red citation count means the answer cited a page that was not
               retrieved.
             </CardDescription>
@@ -360,23 +371,23 @@ export function Dashboard() {
               <div className="overflow-x-auto">
                 <Table className="min-w-[52rem]">
                   <TableHeader>
-                    <TableRow className="border-y border-rule hover:bg-transparent">
-                      <TableHead className="pl-4 text-quiet">Question</TableHead>
-                      <TableHead className="text-quiet">Scope</TableHead>
-                      <TableHead className="text-quiet">Status</TableHead>
-                      <TableHead className="text-right text-quiet">Passages</TableHead>
-                      <TableHead className="text-right text-quiet">Top score</TableHead>
-                      <TableHead className="text-right text-quiet">Citations</TableHead>
-                      <TableHead className="text-right text-quiet">Tokens</TableHead>
-                      <TableHead className="text-right text-quiet">Latency</TableHead>
-                      <TableHead className="pr-4 text-right text-quiet">When</TableHead>
+                    <TableRow className="border-y border-hair hover:bg-transparent">
+                      <TableHead className="pl-4 text-faint">Question</TableHead>
+                      <TableHead className="text-faint">Scope</TableHead>
+                      <TableHead className="text-faint">Status</TableHead>
+                      <TableHead className="text-right text-faint">Passages</TableHead>
+                      <TableHead className="text-right text-faint">Top score</TableHead>
+                      <TableHead className="text-right text-faint">Citations</TableHead>
+                      <TableHead className="text-right text-faint">Tokens</TableHead>
+                      <TableHead className="text-right text-faint">Latency</TableHead>
+                      <TableHead className="pr-4 text-right text-faint">When</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {queries.map((q) => {
                       const s = STATUS_COPY[q.status]
                       return (
-                        <TableRow key={q.id} className="border-rule">
+                        <TableRow key={q.id} className="border-hair">
                           <TableCell className="pl-4">
                             {/* truncate needs a block box: max-width on a td is
                                 ignored under auto table layout */}
@@ -384,14 +395,14 @@ export function Dashboard() {
                               {q.question}
                             </div>
                           </TableCell>
-                          <TableCell className="text-xs text-quiet">
+                          <TableCell className="text-xs text-faint">
                             {q.corpus_wide ? 'All documents' : 'Scoped'}
                           </TableCell>
                           <TableCell>
                             <Badge variant={s.variant}>{s.label}</Badge>
                           </TableCell>
                           <TableCell className="tabular text-right">{q.n_hits}</TableCell>
-                          <TableCell className="tabular text-right text-quiet">
+                          <TableCell className="tabular text-right text-faint">
                             {q.top_score === null ? '—' : q.top_score.toFixed(4)}
                           </TableCell>
                           <TableCell className="tabular text-right">
@@ -403,13 +414,13 @@ export function Dashboard() {
                               q.n_citations
                             )}
                           </TableCell>
-                          <TableCell className="tabular text-right text-quiet">
+                          <TableCell className="tabular text-right text-faint">
                             {compact(q.prompt_tokens + q.completion_tokens)}
                           </TableCell>
-                          <TableCell className="tabular text-right text-quiet">
+                          <TableCell className="tabular text-right text-faint">
                             {ms(q.retrieval_ms + q.generation_ms)}
                           </TableCell>
-                          <TableCell className="pr-4 text-right text-xs text-quiet">
+                          <TableCell className="pr-4 text-right text-xs text-faint">
                             {stamp(q.created_at)}
                           </TableCell>
                         </TableRow>
@@ -428,10 +439,10 @@ export function Dashboard() {
 
 function Rows({ rows }: { rows: [string, string][] }) {
   return (
-    <dl className="divide-y divide-rule">
+    <dl className="divide-y divide-hair/70">
       {rows.map(([k, v]) => (
         <div key={k} className="flex items-baseline justify-between gap-3 py-1.5 first:pt-0">
-          <dt className="text-xs text-quiet">{k}</dt>
+          <dt className="text-xs text-faint">{k}</dt>
           <dd className="tabular truncate text-sm">{v}</dd>
         </div>
       ))}
@@ -443,7 +454,7 @@ function SingleEval({ run }: { run: EvalRun }) {
   const rate = (n: number) => `${((n / run.n_questions) * 100).toFixed(0)}%`
   return (
     <>
-      <p className="text-xs text-quiet">
+      <p className="text-xs text-faint">
         One run so far, so there is no trend to plot yet. Run the harness again to see movement.
       </p>
       <dl className="mt-3 grid grid-cols-2 gap-x-8 gap-y-1.5 sm:grid-cols-3">
@@ -455,8 +466,8 @@ function SingleEval({ run }: { run: EvalRun }) {
           ['Citations clean', run.n_graded ? `${run.n_citation_clean}/${run.n_graded}` : 'not graded'],
           ['Took', `${run.duration_s}s`],
         ].map(([k, v]) => (
-          <div key={k} className="border-t border-rule pt-1.5">
-            <dt className="text-xs text-quiet">{k}</dt>
+          <div key={k} className="border-t border-hair pt-1.5">
+            <dt className="text-xs text-faint">{k}</dt>
             <dd className="tabular text-sm">{v}</dd>
           </div>
         ))}

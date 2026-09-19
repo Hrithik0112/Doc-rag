@@ -24,23 +24,25 @@ export function UploadZone({ onUploaded }: { onUploaded: () => void }) {
   }
 
   return (
-    <div className="flex-none border-t border-rule p-3">
+    <div className="flex-none border-t border-hair/70 p-3">
       <button
         type="button"
         className={`block w-full border border-dashed px-4 py-5 text-center text-[13px] transition-colors ${
-          over ? 'border-solid border-trace text-trace' : 'border-rule text-quiet'
+          over
+            ? 'border-solid border-glow bg-glow/10 text-glow shadow-[0_0_30px_-8px_var(--accent)]'
+            : 'border-hair text-dim hover:border-halo hover:text-text'
         }`}
         onClick={() => input.current?.click()}
         onDragOver={(e) => { e.preventDefault(); setOver(true) }}
         onDragLeave={() => setOver(false)}
         onDrop={(e) => { e.preventDefault(); setOver(false); send(e.dataTransfer.files) }}
       >
-        <strong className="mb-0.5 block font-medium text-ink">
+        <strong className="mb-0.5 block font-medium text-text">
           {busy ? 'Reading the file' : 'Add a PDF'}
         </strong>
         {busy ? 'Splitting it into passages' : 'Drop it here, or click to choose'}
       </button>
-      {error && <p className="mt-2 text-xs text-oxide">{error}</p>}
+      {error && <p className="mt-2 text-xs text-critical">{error}</p>}
       <input ref={input} type="file" accept="application/pdf" hidden
              onChange={(e) => send(e.target.files)} />
     </div>

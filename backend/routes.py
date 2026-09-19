@@ -168,7 +168,8 @@ async def stats_overview():
 
 @router.get("/stats/timeseries")
 async def stats_timeseries(days: int = 14):
-    return await stats.timeseries(max(1, min(days, 90)))
+    # the activity grid asks for a year; generate_series zero-fills the gaps
+    return await stats.timeseries(max(1, min(days, 400)))
 
 
 @router.get("/stats/queries")
