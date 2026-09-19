@@ -5,6 +5,8 @@ import math
 import re
 import time
 
+import tiktoken
+
 from google import genai
 from google.genai import types
 
@@ -12,6 +14,15 @@ from .config import CHAT_MODEL, EMBED_DIM, EMBED_MODEL, GEMINI_API_KEY
 
 DOCUMENT = "RETRIEVAL_DOCUMENT"
 QUERY = "RETRIEVAL_QUERY"
+
+# The embed endpoint returns no usage metadata, so embedding cost can only be
+# estimated locally. cl100k is not Gemini's tokenizer, so this is within maybe
+# 10-15% -- everything downstream carries "_est" in the name to keep that visible.
+_est_enc = tiktoken.get_encoding("cl100k_base")
+
+
+def estimate_tokens(texts: list[str]) -> int:
+    return sum(len(_est_enc.encode(t)) for t in texts)
 
 # Free-tier quota guard. One call at a time, spaced to stay under the per-minute
 # cap. Generation is the tighter of the two (15/min on the lite models), so it
@@ -88,8 +99,14 @@ async def _backoff(e: Exception, attempt: int, attempts: int) -> None:
     await asyncio.sleep(retry_after or 2**attempt)
 
 
-async def embed(texts: list[str], task_type: str) -> list[list[float]]:
-    """Embed texts. Raises QuotaExceeded on 429 so the caller can checkpoint."""
+async def embed(
+    texts: list[str], task_type: str, usage: dict | None = None
+) -> list[list[float]]:
+    """Embed texts. Raises QuotaExceeded on 429 so the caller can checkpoint.
+
+    If `usage` is given, accumulates "embed_tokens_est" and "embed_calls" into it."""
+    if usage is not None:
+        usage["embed_tokens_est"] = usage.get("embed_tokens_est", 0) + estimate_tokens(texts)
     out: list[list[float]] = []
     for batch in _batches(texts):
         async with _gate:
@@ -106,15 +123,20 @@ async def embed(texts: list[str], task_type: str) -> list[list[float]]:
                     break
                 except Exception as e:
                     await _backoff(e, attempt, 5)
+        if usage is not None:
+            usage["embed_calls"] = usage.get("embed_calls", 0) + 1
         out += [_l2_normalize(list(e.values)) for e in r.embeddings]
     return out
 
 
-async def stream_answer(prompt: str):
+async def stream_answer(prompt: str, usage: dict | None = None):
     """Yield answer text chunks as they arrive.
 
     Retries only before the first token. Once text has reached the caller a retry
-    would duplicate it, so a mid-stream failure is raised instead of hidden."""
+    would duplicate it, so a mid-stream failure is raised instead of hidden.
+
+    If `usage` is given, fills in real token counts. The streaming API reports
+    usage on trailing chunks, so read every chunk and keep the last one seen."""
     for attempt in range(5):
         started = False
         try:
@@ -124,6 +146,8 @@ async def stream_answer(prompt: str):
                     model=CHAT_MODEL, contents=prompt
                 )
                 async for part in stream:
+                    if usage is not None and part.usage_metadata:
+                        _record(usage, part.usage_metadata)
                     if part.text:
                         started = True
                         yield part.text
@@ -134,7 +158,13 @@ async def stream_answer(prompt: str):
             await _backoff(e, attempt, 5)
 
 
-async def complete(prompt: str) -> str:
+def _record(usage: dict, meta) -> None:
+    """Token counts here are reported by the API, not estimated."""
+    usage["prompt_tokens"] = meta.prompt_token_count or 0
+    usage["completion_tokens"] = meta.candidates_token_count or 0
+
+
+async def complete(prompt: str, usage: dict | None = None) -> str:
     """Non-streaming generation. Used by the eval grader."""
     for attempt in range(5):
         err = None
@@ -144,6 +174,8 @@ async def complete(prompt: str) -> str:
                 r = await client().aio.models.generate_content(
                     model=CHAT_MODEL, contents=prompt
                 )
+                if usage is not None and r.usage_metadata:
+                    _record(usage, r.usage_metadata)
                 return r.text or ""
             except Exception as e:
                 err = e
@@ -176,8 +208,17 @@ async def _self_check():
     q = (await embed(["where did the cat sit?"], QUERY))[0]
     assert cos(q, v[0]) > cos(q, v[2]), "asymmetric query embedding broken"
 
-    got = "".join([c async for c in stream_answer("Reply with exactly: PONG")])
+    u: dict = {}
+    got = "".join([c async for c in stream_answer("Reply with exactly: PONG", u)])
     assert "PONG" in got.upper(), f"generation broken: {got!r}"
+    assert u.get("prompt_tokens", 0) > 0 and u.get("completion_tokens", 0) > 0, (
+        f"streaming usage not captured: {u}"
+    )
+    eu: dict = {}
+    await embed(["token accounting"], DOCUMENT, eu)
+    assert eu["embed_tokens_est"] > 0 and eu["embed_calls"] == 1, f"embed usage: {eu}"
+    print(f"ok  usage: generation {u['prompt_tokens']}+{u['completion_tokens']} reported, "
+          f"embedding {eu['embed_tokens_est']} estimated")
     print(f"ok  dim={EMBED_DIM} normalized  related={near:.3f} > unrelated={far:.3f}")
     print(f"ok  streaming: {got.strip()!r}")
 

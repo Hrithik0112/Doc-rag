@@ -85,3 +85,54 @@ export async function askQuestion(
     }
   }
 }
+
+// ── dashboard ──────────────────────────────────────────────────────────────
+
+export type Overview = {
+  documents: number; documents_ready: number; documents_failed: number
+  documents_working: number; pages: number; chunks: number; chunks_unembedded: number
+  ingest_tokens_est: number
+  queries: number; queries_ok: number; queries_quota: number; queries_error: number
+  queries_no_hits: number; queries_cited: number; queries_clean: number
+  unverified_citations: number; total_citations: number
+  prompt_tokens: number; completion_tokens: number; query_embed_tokens_est: number
+  retrieval_ms_p50: number | null; retrieval_ms_p95: number | null
+  generation_ms_p50: number | null; generation_ms_p95: number | null
+  hits_vector_only: number; hits_keyword_only: number; hits_both_arms: number
+  embed_model: string; chat_model: string
+}
+
+export type DayPoint = {
+  day: string; queries: number; failed: number; tokens: number; unverified: number
+}
+
+export type ScoreBucket = { bucket: number; floor: number; ceiling: number; n: number }
+
+export type QueryRow = {
+  id: string; question: string; status: 'ok' | 'no_hits' | 'quota' | 'error'
+  error: string | null; n_hits: number; top_score: number | null
+  hits: { page: number; filename: string; score: number; arms: string[] }[]
+  n_citations: number; n_unverified: number
+  prompt_tokens: number; completion_tokens: number; embed_tokens_est: number
+  retrieval_ms: number; generation_ms: number; created_at: string
+  corpus_wide: boolean
+}
+
+export type EvalRun = {
+  id: string; embed_model: string; chat_model: string; n_questions: number
+  recall_hybrid: number; recall_vector: number; n_graded: number
+  n_correct: number; n_partial: number; n_citation_clean: number
+  duration_s: number; created_at: string
+}
+
+const get = <T,>(path: string): Promise<T> =>
+  fetch(`/api${path}`).then((r) => {
+    if (!r.ok) throw new Error(`${path} failed (${r.status})`)
+    return r.json()
+  })
+
+export const getOverview = () => get<Overview>('/stats/overview')
+export const getTimeseries = (days = 14) => get<DayPoint[]>(`/stats/timeseries?days=${days}`)
+export const getScoreBuckets = () => get<ScoreBucket[]>('/stats/scores')
+export const getRecentQueries = (limit = 25) => get<QueryRow[]>(`/stats/queries?limit=${limit}`)
+export const getEvalRuns = () => get<EvalRun[]>('/stats/evals')

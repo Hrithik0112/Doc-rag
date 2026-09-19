@@ -7,6 +7,7 @@ so a quota failure mid-document costs nothing and never redoes work.
 
 import asyncio
 import re
+import time
 
 import pymupdf
 import tiktoken
@@ -80,6 +81,8 @@ async def embed_pending(doc_id: str):
         await conn.execute(
             "UPDATE documents SET status='processing', error=NULL WHERE id=$1", doc_id
         )
+    usage: dict = {}
+    started = time.monotonic()
     try:
         while True:
             async with p.acquire() as conn:
@@ -92,7 +95,9 @@ async def embed_pending(doc_id: str):
             if not rows:
                 break
 
-            vectors = await gemini.embed([r["content"] for r in rows], gemini.DOCUMENT)
+            vectors = await gemini.embed(
+                [r["content"] for r in rows], gemini.DOCUMENT, usage
+            )
 
             async with p.acquire() as conn, conn.transaction():
                 await conn.executemany(
@@ -102,10 +107,15 @@ async def embed_pending(doc_id: str):
                 await conn.execute(
                     "UPDATE documents SET n_embedded = ("
                     "  SELECT count(*) FROM chunks "
-                    "  WHERE document_id=$1 AND embedding IS NOT NULL) "
+                    "  WHERE document_id=$1 AND embedding IS NOT NULL), "
+                    "  embed_tokens_est = embed_tokens_est + $2, "
+                    "  indexed_ms = indexed_ms + $3 "
                     "WHERE id=$1",
                     doc_id,
+                    usage.pop("embed_tokens_est", 0),
+                    int((time.monotonic() - started) * 1000),
                 )
+                started = time.monotonic()
 
         async with p.acquire() as conn:
             await conn.execute("UPDATE documents SET status='ready' WHERE id=$1", doc_id)

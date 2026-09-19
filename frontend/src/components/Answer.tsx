@@ -65,7 +65,9 @@ export function Answer({
       nodes.push(
         <sup
           key={`${m.index}-${j}`}
-          className={`pin${n === null ? ' bad' : ''}`}
+          className={`px-[.1em] align-[.35em] font-sans text-[11px] font-medium ${
+            n === null ? 'text-oxide' : 'text-trace'
+          }`}
           title={n === null ? `${label} is not among the retrieved passages` : label}
         >
           {n === null ? '!' : n}
@@ -76,9 +78,14 @@ export function Answer({
   nodes.push(text.slice(last))
 
   return (
-    <div className="answer">
+    <div className="whitespace-pre-wrap font-serif text-[17px] leading-[1.68]">
       {nodes}
-      {streaming && <span className="caret" aria-label="Writing" />}
+      {streaming && (
+        <span
+          aria-label="Writing"
+          className="ml-[.06em] inline-block h-[1.05em] w-[.5em] animate-[blink_1.1s_steps(1,end)_infinite] align-[-.16em] bg-trace"
+        />
+      )}
     </div>
   )
 }
