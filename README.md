@@ -77,9 +77,11 @@ gradient. Masking has no edge to see, and it leaves the copy sitting on the page
 ground, so the text's contrast is the token contrast rather than a function of wherever
 the gradient happens to be bright that second.
 
-Two configs rather than one with swapped colours. The light ground has far less room, so
-it runs slower and with less distortion, or the motion reads as a smear across the paper
-instead of light moving over it.
+**One motion, two palettes.** Every shape and timing value is shared, so the hero animates
+identically in both themes and only the colour changes. The light ramp reaches further
+down into deep brass than the dark one reaches up, because the same motion over three
+near-white tones is invisible; matching the *range* is what makes one animation read in
+both grounds, not matching the values.
 
 A canvas animation loops on `requestAnimationFrame`, which a CSS `prefers-reduced-motion`
 rule cannot stop, so the component checks the query itself and renders a still gradient in

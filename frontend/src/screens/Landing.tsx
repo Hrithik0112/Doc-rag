@@ -48,46 +48,32 @@ export function Landing() {
   }
   const shown = real ?? SAMPLE
 
-  /* The landing page's own weather; the working screens stay flat.
-     Two configs rather than one with swapped colours: the light ground has far
-     less room, so it runs slower, softer and with less distortion, or the
-     motion reads as a smear across the paper instead of light moving over it. */
-  const gradient =
-    theme === 'dark'
-      ? {
-          preset: 'custom' as const,
-          color1: '#0d1219',
-          color2: '#14384a',
-          color3: '#d6a447',
-          rotation: -38,
-          proportion: 52,
-          scale: 0.7,
-          speed: 14,
-          distortion: 38,
-          swirl: 72,
-          swirlIterations: 9,
-          softness: 95,
-          offset: 180,
-          shape: 'Edge' as const,
-          shapeSize: 55,
-        }
-      : {
-          preset: 'custom' as const,
-          color1: '#f5f3ef',
-          color2: '#e4d3ac',
-          color3: '#b8913f',
-          rotation: -38,
-          proportion: 58,
-          scale: 0.85,
-          speed: 9,
-          distortion: 22,
-          swirl: 48,
-          swirlIterations: 7,
-          softness: 100,
-          offset: 140,
-          shape: 'Edge' as const,
-          shapeSize: 60,
-        }
+  /* The landing page's own weather.
+     One motion, two palettes. Every shape and timing value is shared, so the
+     hero animates identically in both themes and only the colour changes. The
+     light ramp reaches further down into deep brass than the dark one reaches
+     up, because the same motion over three near-white tones is invisible. */
+  const MOTION = {
+    preset: 'custom' as const,
+    rotation: -38,
+    proportion: 55,
+    scale: 0.78,
+    speed: 12,
+    distortion: 32,
+    swirl: 64,
+    swirlIterations: 8,
+    softness: 98,
+    offset: 168,
+    shape: 'Edge' as const,
+    shapeSize: 58,
+  }
+
+  const PALETTE = {
+    dark: { color1: '#0a0e14', color2: '#123040', color3: '#c9963a' },
+    light: { color1: '#f5f3ef', color2: '#cdb37a', color3: '#9c7326' },
+  }
+
+  const gradient = { ...MOTION, ...PALETTE[theme] }
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
@@ -122,7 +108,7 @@ export function Landing() {
             <AnimatedGradient
               key={theme}
               config={gradient}
-              noise={{ opacity: theme === 'dark' ? 0.07 : 0.04, scale: 0.6 }}
+              noise={{ opacity: 0.06, scale: 0.6 }}
               className="size-full"
             />
           )}
