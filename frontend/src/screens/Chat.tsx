@@ -25,7 +25,7 @@ export function Chat() {
   const refresh = useCallback(() => { listDocuments().then(setDocs) }, [])
   useEffect(() => { refresh() }, [refresh])
 
-  // poll only while something is actually indexing
+  // poll only while something is indexing
   const working = docs.some((d) => d.status === 'pending' || d.status === 'processing')
   useEffect(() => {
     if (!working) return
@@ -44,7 +44,8 @@ export function Chat() {
   function toggle(id: string) {
     setSelected((prev) => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
   }
@@ -147,7 +148,7 @@ export function Chat() {
             <button
               onClick={ask}
               disabled={!canAsk}
-              className="rounded-md bg-glow px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-[0_0_26px_-6px_var(--accent)] transition-shadow hover:shadow-[0_0_34px_-4px_var(--accent)] disabled:cursor-not-allowed disabled:bg-raised disabled:text-faint disabled:shadow-none"
+              className="press rounded-md bg-glow px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-[0_0_26px_-6px_var(--accent)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:bg-raised disabled:text-faint disabled:shadow-none"
             >
               {busy ? 'Answering' : 'Ask'}
             </button>

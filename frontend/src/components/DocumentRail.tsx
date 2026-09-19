@@ -51,7 +51,12 @@ export function DocumentRail({
 
             {working && (
               <span className="mt-1.5 block h-[3px] overflow-hidden rounded-full bg-hair">
-                <i className="block h-full rounded-full bg-glow shadow-[0_0_8px_var(--accent)] transition-[width] duration-300" style={{ width: `${pct}%` }} />
+                {/* scaleX, not width: width is a layout property. linear, because
+                    a progress bar is constant motion rather than an entrance. */}
+                <i
+                  className="block h-full w-full origin-left bg-glow shadow-[0_0_8px_var(--accent)] transition-transform duration-300 ease-linear"
+                  style={{ transform: `scaleX(${pct / 100})` }}
+                />
               </span>
             )}
 

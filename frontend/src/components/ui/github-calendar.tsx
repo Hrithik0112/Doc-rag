@@ -71,11 +71,11 @@ const colorSchemas = {
 /** Steps of the UI accent rather than a stock Tailwind ramp, so the grid reads
  *  as part of this product. Sequential: one hue, light to dark. */
 const ACCENT_STEPS = [
-    "bg-[#131c22]",
-    "bg-[#0d5744]",
-    "bg-[#008866]",
-    "bg-[#00ab84]",
-    "bg-[#2fe0b0]",
+    "bg-[var(--act-0)]",
+    "bg-[var(--act-1)]",
+    "bg-[var(--act-2)]",
+    "bg-[var(--act-3)]",
+    "bg-[var(--act-4)]",
 ] as const
 
 function getLevelClass(level: string, schema: keyof typeof colorSchemas = "green") {
@@ -234,7 +234,7 @@ export function GithubCalendar({
                                     style={
                                         isGlowing ? {
                                             boxShadow: day.contributionLevel !== "NONE"
-                                                ? `0 0 ${day.contributionCount > 3 ? `${glowIntensity * 1.5}px` : `${glowIntensity}px`} ${colorSchema === 'green' ? '#00c79a' :
+                                                ? `0 0 ${day.contributionCount > 3 ? `${glowIntensity * 1.5}px` : `${glowIntensity}px`} ${colorSchema === 'green' ? 'var(--accent)' :
                                                     colorSchema === 'blue' ? '#3b82f6' :
                                                         colorSchema === 'purple' ? '#a855f7' :
                                                             '#f97316'

@@ -18,7 +18,11 @@ export function Margin({
       </p>
 
       {sources.map((s, i) => (
-        <details key={`${s.document_id}-${s.page}-${i}`} className="group border-b border-hair/70 last:border-b-0">
+        <details
+          key={`${s.document_id}-${s.page}-${i}`}
+          className="border-b border-hair/70 [animation:rise_240ms_var(--ease-snap)_backwards] last:border-b-0"
+          style={{ animationDelay: `${i * 40}ms` }}
+        >
           <summary className="flex cursor-pointer list-none items-baseline gap-2 py-2.5 transition-colors hover:text-glow [&::-webkit-details-marker]:hidden">
             <span className="tabular min-w-[1.25rem] text-[11px] font-semibold text-glow">{i + 1}</span>
             <span className="min-w-0 text-[13px] leading-snug">

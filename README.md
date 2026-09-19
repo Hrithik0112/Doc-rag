@@ -53,23 +53,66 @@ would need one before this ran for anyone else.
 
 ## Interface
 
-Dark, with an ambient grain field behind the work and glass panels over it. Two screens,
-`#ask` and `#instrumentation`, reached from a magnetic dock.
+Three screens: a landing page at `/`, `#ask`, and `#instrumentation`, reached from a plain
+nav bar. The working screens are flat and quiet. The landing page is the only one with
+weather.
 
-Motion is rationed. The one mechanical moment is the lead figure on the dashboard, which
-flips like a departure board; everything else stays still so that movement keeps its
-meaning. `prefers-reduced-motion` is respected throughout.
+**Motion.** Two custom easing curves in `index.css`; the built-in CSS easings are too
+weak to read as intentional. `ease-in` is never used, because it delays the first movement,
+which is the moment being watched most closely. Buttons carry `.press`, a 140ms
+`scale(0.97)` on `:active`, so the interface visibly hears the click. Conventions follow
+[Emil Kowalski's design engineering skill](https://emilkowal.ski/skill)
+(`npx skills add emilkowalski/skill`).
 
-Several pieces come from the [Componentry](https://componentry.dev) registry, wired in as
-a shadcn registry in `frontend/components.json`:
+**Typography.** Three faces, one job each. `Instrument Serif` is display only, set large
+with tight tracking; it ships a single weight and a high-contrast cut that falls apart at
+body size. `Newsreader` is the reading surface, which is every answer and question.
+`Archivo` is the interface.
+
+**The landing page** has one job: show the core gesture rather than describe it. An answer
+with numbered citations you can open, then the same thing failing. It prefers a question
+this instance actually answered, and falls back to a worked example **labelled as an
+example**, because a landing page for a tool about provenance should not pass invented
+output off as a real answer. The passages it lists carry the fusion score and which
+retrieval arm matched, not quoted text, because the query log deliberately never stores
+passage contents.
+
+A WebGL gradient flows behind the right half of the hero. It is **masked in** rather than
+covered by a scrim: a scrim wide enough to protect display type leaves a visible vertical
+seam where its ramp begins, and a scrim dark enough for contrast simply hides the
+gradient. Masking has no edge to see, and it leaves the copy sitting on the page's own
+ground, so the text's contrast is the token contrast rather than a function of wherever
+the gradient happens to be bright that second.
+
+**One motion, two palettes.** Every shape and timing value is shared, so the hero animates
+identically in both themes and only the colour changes. The light ramp reaches further
+down into deep brass than the dark one reaches up, because the same motion over three
+near-white tones is invisible; matching the *range* is what makes one animation read in
+both grounds, not matching the values.
+
+A canvas animation loops on `requestAnimationFrame`, which a CSS `prefers-reduced-motion`
+rule cannot stop, so the component checks the query itself and renders a still gradient in
+the same colours instead.
+
+**Dark and light, with a toggle.** The theme is resolved by an inline script in
+`index.html` before first paint, so there is no flash, and `<html data-theme>` is the
+single source of truth. `lib/theme.ts` reads it through one `useSyncExternalStore`, not a
+`useState` per caller: a private copy per component means the toggle updates its own copy
+and the attribute while every other consumer keeps rendering the old theme. Anything
+driven by a CSS variable still flips, so that bug hides well -- only the things taking
+colour as a prop stay stuck, and only until the next full page load. Tailwind's `dark:` variant is rebound to that attribute with
+`@custom-variant`, so registry components that ship `dark:` classes follow the toggle
+rather than the operating system. The choice persists in `localStorage`; with no stored
+choice it follows the OS and keeps following it.
+
+Components from the [Componentry](https://componentry.dev) registry, wired in through
+`frontend/components.json`:
 
 | Component | Used for |
 |---|---|
-| `split-flap-display` | the grounding rate, the number that matters most |
+| `aurora-flow` | the hero background |
+| `split-flap-display` | the grounding rate on the dashboard |
 | `github-calendar` | daily question activity |
-| `magnetic-dock` | navigation |
-| `grain-gradient` | the ambient field |
-| `kinetic-text-reveal` | the wordmark |
 
 `github-calendar` is adapted. It shipped fetching a GitHub username from a third-party
 API; this app has its own activity to show and should not be making external calls, so it
@@ -77,7 +120,7 @@ takes the days directly and buckets them locally. Its window grows from twelve w
 toward a year as history accumulates, because a full-year grid with one active day is
 mostly dead space and padding it with invented history would be worse.
 
-To pull more components:
+To pull more:
 
 ```bash
 cd frontend && npx shadcn@latest add @componentry/<name>
@@ -172,17 +215,35 @@ documents full of identifiers, part numbers and dates.
 
 ## Colour
 
-There are two validated palettes in this repo's history, and the dark one is not a
-brightened copy of the light one. Dark mode was stepped separately and re-validated,
-because the intuitive version failed: the "obviously brighter" candidate put blue and
-violet at delta-E 0.2 for protanopes, which is to say the same colour.
+The visual idea is a document that has been worked on. Light is **warm bond paper**;
+dark is **the light theme's ink grown into a page**, a deep navy rather than a neutral
+black, so neither mode is a generic grey.
 
-The shipped dark set is three hues, `#00ab84 #6180e8 #c07f14`, checked at every pair
-against the panel surface for lightness band, chroma floor, colour-vision separation and
-contrast. Three, not four, because three is the most ever shown at once. Do not swap one
-without re-validating the whole set.
+The accent is **brass**, and it marks annotation: citation pins, focus, active
+navigation, the progress bar. That is what a citation is. Verification is a separate
+signal in green, so a mark and a judgement are never confused. It replaces a mint teal
+that read as the default AI-product accent.
 
-Status colours are reserved and always ship with a text label, never colour alone.
+|  | Ground | Ink | Accent | Chart hues |
+|---|---|---|---|---|
+| Dark | `#0d1219` | `#e8e6e0` | `#d6a447` | `#00a98a` `#7086ef` `#c2861c` |
+| Light | `#f5f3ef` | `#1a2233` | `#835c10` | `#00806a` `#3f5ddd` `#9d6412` |
+
+Two validated palettes, not one inverted. Each chart set was stepped against its own
+panel surface and checked at every pair for lightness band, chroma floor, colour-vision
+separation and contrast. Every text colour clears 4.5:1 against every ground it can sit
+on, checked separately, because the categorical validator does not cover text.
+
+Three chart slots in both themes, not four, because three is the most ever shown at
+once. `warning` is the accent itself rather than a fourth hue, since it marks an
+attention state rather than a category. Do not swap one without re-validating the set.
+
+Recharts takes colours as props rather than CSS variables, so `lib/chart.ts` re-derives
+the whole config when the theme flips. Glow is a dark-mode device; on a light ground it
+becomes haze, so `.glow-text` and `.glow-ring` fall back to a plain hairline.
+
+Status is never colour alone: every badge carries a label, and the lead figure spells
+out its ratio in words beneath the number.
 
 ## Cost of the redesign
 

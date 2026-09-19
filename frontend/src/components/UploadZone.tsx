@@ -27,7 +27,7 @@ export function UploadZone({ onUploaded }: { onUploaded: () => void }) {
     <div className="flex-none border-t border-hair/70 p-3">
       <button
         type="button"
-        className={`block w-full border border-dashed px-4 py-5 text-center text-[13px] transition-colors ${
+        className={`press block w-full border border-dashed px-4 py-5 text-center text-[13px] transition-colors ${
           over
             ? 'border-solid border-glow bg-glow/10 text-glow shadow-[0_0_30px_-8px_var(--accent)]'
             : 'border-hair text-dim hover:border-halo hover:text-text'
