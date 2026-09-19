@@ -89,7 +89,11 @@ the same colours instead.
 
 **Dark and light, with a toggle.** The theme is resolved by an inline script in
 `index.html` before first paint, so there is no flash, and `<html data-theme>` is the
-single source of truth. Tailwind's `dark:` variant is rebound to that attribute with
+single source of truth. `lib/theme.ts` reads it through one `useSyncExternalStore`, not a
+`useState` per caller: a private copy per component means the toggle updates its own copy
+and the attribute while every other consumer keeps rendering the old theme. Anything
+driven by a CSS variable still flips, so that bug hides well -- only the things taking
+colour as a prop stay stuck, and only until the next full page load. Tailwind's `dark:` variant is rebound to that attribute with
 `@custom-variant`, so registry components that ship `dark:` classes follow the toggle
 rather than the operating system. The choice persists in `localStorage`; with no stored
 choice it follows the OS and keeps following it.
