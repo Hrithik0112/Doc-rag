@@ -5,7 +5,7 @@ the two incomparable scales, and no tuning."""
 
 import asyncio
 
-from . import gemini
+from . import gemini, obs
 from .db import pool
 
 RRF_K = 60       # standard RRF constant
@@ -46,13 +46,22 @@ async def search(question: str, doc_ids: list[str] | None = None, top_k: int = T
                  use_keyword: bool = True, usage: dict | None = None) -> list[dict]:
     """doc_ids=None searches the whole corpus. use_keyword=False gives the
     vector-only baseline the eval harness compares against."""
-    qvec = (await gemini.embed([question], gemini.QUERY, usage))[0]
-    p = await pool()
-    async with p.acquire() as conn:
-        rows = await conn.fetch(
-            _SQL, qvec, doc_ids, question if use_keyword else "",
-            CANDIDATES, top_k, RRF_K,
-        )
+    # One number for "retrieval" cannot tell a throttled embed call apart from
+    # a slow query. These are the two things that actually differ.
+    with obs.span("embed_query") as embed_took:
+        qvec = (await gemini.embed([question], gemini.QUERY, usage))[0]
+    with obs.span("vector_search", corpus_wide=doc_ids is None) as search_took:
+        p = await pool()
+        async with p.acquire() as conn:
+            rows = await conn.fetch(
+                _SQL, qvec, doc_ids, question if use_keyword else "",
+                CANDIDATES, top_k, RRF_K,
+            )
+    if usage is not None:
+        usage["embed_ms"] = embed_took["ms"]
+        usage["search_ms"] = search_took["ms"]
+    obs.QUERY_SECONDS.labels(stage="embed").observe(embed_took["ms"] / 1000)
+    obs.QUERY_SECONDS.labels(stage="search").observe(search_took["ms"] / 1000)
     return [dict(r) for r in rows]
 
 

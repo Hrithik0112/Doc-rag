@@ -5,8 +5,9 @@ import {
 } from 'recharts'
 import { GithubCalendar } from '@/components/ui/github-calendar'
 import {
-  getEvalRuns, getOverview, getRecentQueries, getScoreBuckets, getTimeseries,
-  type DayPoint, type EvalRun, type Overview, type QueryRow, type ScoreBucket,
+  getErrorKinds, getEvalRuns, getOverview, getRecentQueries, getScoreBuckets,
+  getTimeseries, type DayPoint, type ErrorKind, type EvalRun, type Overview,
+  type QueryRow, type ScoreBucket,
 } from '../api'
 import { Band, Empty, Figure, Meter } from '../components/Figures'
 import { Badge } from '@/components/ui/badge'
@@ -16,7 +17,7 @@ import {
 } from '@/components/ui/table'
 import { chartTheme } from '../lib/chart'
 import { useTheme } from '../lib/theme'
-import { compact, day, ms, pctLabel, stamp } from '../lib/format'
+import { compact, day, ERROR_KIND_LABEL, ms, pctLabel, stamp, usd } from '../lib/format'
 
 type Data = {
   overview: Overview
@@ -24,6 +25,7 @@ type Data = {
   buckets: ScoreBucket[]
   queries: QueryRow[]
   evals: EvalRun[]
+  errors: ErrorKind[]
 }
 
 const STATUS_COPY: Record<
@@ -48,10 +50,11 @@ export function Dashboard() {
     let alive = true
     const load = () =>
       Promise.all([
-        getOverview(), getTimeseries(364), getScoreBuckets(), getRecentQueries(25), getEvalRuns(),
+        getOverview(), getTimeseries(364), getScoreBuckets(), getRecentQueries(25),
+        getEvalRuns(), getErrorKinds(),
       ])
-        .then(([overview, series, buckets, queries, evals]) => {
-          if (alive) { setData({ overview, series, buckets, queries, evals }); setError(null) }
+        .then(([overview, series, buckets, queries, evals, errors]) => {
+          if (alive) { setData({ overview, series, buckets, queries, evals, errors }); setError(null) }
         })
         .catch((e) => alive && setError(e instanceof Error ? e.message : 'Could not load stats'))
     load()
@@ -71,7 +74,7 @@ export function Dashboard() {
     )
   }
 
-  const { overview: o, series, buckets, queries, evals } = data
+  const { overview: o, series, buckets, queries, evals, errors } = data
   const recent = series.slice(-14)
   // Window the grid to the data. A full year with one active day is mostly dead
   // space; padding it with invented history would be worse. Starts 12 weeks back
@@ -261,6 +264,97 @@ export function Dashboard() {
           </Card>
         </div>
 
+        {/* ── cost, stage split, reliability ───────────────────────── */}
+        <div className="mt-5 grid grid-cols-3 gap-5 max-lg:grid-cols-1">
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-serif text-base font-medium">Cost</CardTitle>
+              <CardDescription className="text-xs text-faint">
+                What this traffic would cost at paid-tier list prices. The free tier bills
+                nothing, so actual spend is $0.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Rows
+                rows={[
+                  ['Answering questions', usd(o.query_cost_usd)],
+                  ['Indexing documents', usd(o.ingest_cost_usd)],
+                  ['Combined', usd(o.query_cost_usd + o.ingest_cost_usd)],
+                  ['Actually billed', '$0 (free tier)'],
+                ]}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-serif text-base font-medium">
+                Where retrieval time goes
+              </CardTitle>
+              <CardDescription className="text-xs text-faint">
+                Embedding the question is a network round trip; search is local SQL.
+                One number for both hides which is slow.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {o.n_staged === 0 ? (
+                <Empty>No queries recorded since stage timing was added.</Empty>
+              ) : (
+                <>
+                  <Meter
+                    parts={[
+                      { label: 'Embedding the question', n: o.embed_ms_p50 ?? 0, color: CHART[1] },
+                      { label: 'Postgres search', n: o.search_ms_p50 ?? 0, color: CHART[0] },
+                    ]}
+                  />
+                  <p className="mt-3 text-xs text-faint">
+                    Median split across {o.n_staged} question
+                    {o.n_staged === 1 ? '' : 's'}.
+                  </p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-serif text-base font-medium">Reliability</CardTitle>
+              <CardDescription className="text-xs text-faint">
+                Retries and throttle waits are self-inflicted latency, not the API
+                being slow
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Rows
+                rows={[
+                  ['Gemini retries', String(o.retries)],
+                  ['Waiting on our rate limiter', ms(o.throttle_ms)],
+                  ['Quota stops', String(o.queries_quota)],
+                  ['Stalled documents', String(o.documents_failed)],
+                ]}
+              />
+              {errors.length > 0 ? (
+                <ul className="mt-3 space-y-1.5 border-t border-hair pt-3">
+                  {errors.map((e) => (
+                    <li key={e.kind} className="flex items-baseline justify-between gap-3 text-xs">
+                      <span className="text-critical">
+                        {ERROR_KIND_LABEL[e.kind] ?? e.kind}
+                      </span>
+                      <span className="tabular text-dim">
+                        {e.queries + e.documents}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-3 border-t border-hair pt-3 text-xs text-faint">
+                  No classified failures recorded.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
         {/* ── corpus, latency, eval ────────────────────────────────── */}
         <div className="mt-5 grid grid-cols-3 gap-5 max-lg:grid-cols-1">
           <Card>
@@ -291,15 +385,20 @@ export function Dashboard() {
             <CardContent>
               <Rows
                 rows={[
-                  ['Retrieval, median', ms(o.retrieval_ms_p50)],
-                  ['Retrieval, p95', ms(o.retrieval_ms_p95)],
+                  // embed and search are medians over staged rows only; the
+                  // retrieval total spans all history, so showing both together
+                  // reads as a contradiction when the sets differ
+                  ['Embedding the question, median', ms(o.embed_ms_p50)],
+                  ['Postgres search, median', ms(o.search_ms_p50)],
                   ['Generation, median', ms(o.generation_ms_p50)],
                   ['Generation, p95', ms(o.generation_ms_p95)],
                 ]}
               />
               <p className="mt-3 text-xs leading-snug text-faint">
-                Retrieval includes one embedding round trip for the question, which is
-                throttled to stay inside the free-tier rate limit.
+                The embedding round trip is throttled to stay inside the free-tier rate
+                limit, which is why it dwarfs the search it feeds. Stage medians cover the{' '}
+                {o.n_staged} question{o.n_staged === 1 ? '' : 's'} recorded since stage
+                timing was added; generation covers all {o.queries_ok}.
               </p>
             </CardContent>
           </Card>
@@ -374,7 +473,7 @@ export function Dashboard() {
               <Empty>Nothing logged yet.</Empty>
             ) : (
               <div className="overflow-x-auto">
-                <Table className="min-w-[52rem]">
+                <Table className="min-w-[58rem]">
                   <TableHeader>
                     <TableRow className="border-y border-hair hover:bg-transparent">
                       <TableHead className="pl-4 text-faint">Question</TableHead>
@@ -384,6 +483,7 @@ export function Dashboard() {
                       <TableHead className="text-right text-faint">Top score</TableHead>
                       <TableHead className="text-right text-faint">Citations</TableHead>
                       <TableHead className="text-right text-faint">Tokens</TableHead>
+                      <TableHead className="text-right text-faint">Would cost</TableHead>
                       <TableHead className="text-right text-faint">Latency</TableHead>
                       <TableHead className="pr-4 text-right text-faint">When</TableHead>
                     </TableRow>
@@ -404,7 +504,9 @@ export function Dashboard() {
                             {q.corpus_wide ? 'All documents' : 'Scoped'}
                           </TableCell>
                           <TableCell>
-                            <Badge variant={s.variant}>{s.label}</Badge>
+                            <Badge variant={s.variant}>
+                              {q.error_kind ? ERROR_KIND_LABEL[q.error_kind] ?? q.error_kind : s.label}
+                            </Badge>
                           </TableCell>
                           <TableCell className="tabular text-right">{q.n_hits}</TableCell>
                           <TableCell className="tabular text-right text-faint">
@@ -423,6 +525,10 @@ export function Dashboard() {
                             {compact(q.prompt_tokens + q.completion_tokens)}
                           </TableCell>
                           <TableCell className="tabular text-right text-faint">
+                            {usd(q.est_cost_usd)}
+                          </TableCell>
+                          <TableCell className="tabular text-right text-faint"
+                                     title={q.request_id ? `request ${q.request_id}` : undefined}>
                             {ms(q.retrieval_ms + q.generation_ms)}
                           </TableCell>
                           <TableCell className="pr-4 text-right text-xs text-faint">

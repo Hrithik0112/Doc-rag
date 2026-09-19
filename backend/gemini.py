@@ -2,6 +2,7 @@
 
 import asyncio
 import math
+import logging
 import re
 import time
 
@@ -10,7 +11,10 @@ import tiktoken
 from google import genai
 from google.genai import types
 
+from . import obs
 from .config import CHAT_MODEL, EMBED_DIM, EMBED_MODEL, GEMINI_API_KEY
+
+_log = obs.log("papertrail.gemini")
 
 DOCUMENT = "RETRIEVAL_DOCUMENT"
 QUERY = "RETRIEVAL_QUERY"
@@ -67,10 +71,15 @@ def _batches(texts: list[str], max_items: int = 64, max_chars: int = 80_000):
         yield batch
 
 
-async def _throttle(kind: str):
+async def _throttle(kind: str, usage: dict | None = None):
+    """Time spent here is self-inflicted, not the API being slow. It has to be
+    separable from upstream latency or every tuning decision is a guess."""
     wait = _MIN_INTERVAL[kind] - (time.monotonic() - _last_call[kind])
     if wait > 0:
         await asyncio.sleep(wait)
+        obs.THROTTLE_SECONDS.labels(op=kind).inc(wait)
+        if usage is not None:
+            usage["throttle_ms"] = usage.get("throttle_ms", 0) + int(wait * 1000)
     _last_call[kind] = time.monotonic()
 
 
@@ -87,10 +96,19 @@ def _classify(e: Exception) -> tuple[bool, float]:
     return False, float(m.group(1)) + 1 if m else 30.0
 
 
-async def _backoff(e: Exception, attempt: int, attempts: int) -> None:
+async def _backoff(e: Exception, attempt: int, attempts: int, op: str,
+                   usage: dict | None = None) -> None:
     """Raise if there is no point retrying, otherwise sleep the right amount."""
     terminal, retry_after = _classify(e)
+    kind = obs.classify(e)
+    obs.RETRIES.labels(op=op, error_kind=kind).inc()
+    if usage is not None:
+        usage["retries"] = usage.get("retries", 0) + 1
+    obs.event(_log, logging.WARNING, "gemini call failed",
+              op=op, attempt=attempt + 1, of=attempts, error_kind=kind,
+              terminal=terminal, retry_after_s=retry_after, error=str(e)[:300])
     if terminal:
+        obs.QUOTA_EXHAUSTED.labels(model=CHAT_MODEL if op == "generate" else EMBED_MODEL).set(1)
         raise QuotaExceeded(str(e)) from e
     if attempt == attempts - 1:
         if retry_after:
@@ -105,13 +123,16 @@ async def embed(
     """Embed texts. Raises QuotaExceeded on 429 so the caller can checkpoint.
 
     If `usage` is given, accumulates "embed_tokens_est" and "embed_calls" into it."""
+    est = estimate_tokens(texts)
+    obs.TOKENS.labels(kind="embed_estimated").inc(est)
+    obs.COST.inc(obs.estimate_cost(embed=est))
     if usage is not None:
-        usage["embed_tokens_est"] = usage.get("embed_tokens_est", 0) + estimate_tokens(texts)
+        usage["embed_tokens_est"] = usage.get("embed_tokens_est", 0) + est
     out: list[list[float]] = []
     for batch in _batches(texts):
         async with _gate:
             for attempt in range(5):
-                await _throttle("embed")
+                await _throttle("embed", usage)
                 try:
                     r = await client().aio.models.embed_content(
                         model=EMBED_MODEL,
@@ -122,7 +143,11 @@ async def embed(
                     )
                     break
                 except Exception as e:
-                    await _backoff(e, attempt, 5)
+                    await _backoff(e, attempt, 5, "embed", usage)
+        obs.GEMINI_CALLS.labels(op="embed", outcome="ok").inc()
+        # a success proves the cap is no longer hit; a gauge only ever set to 1
+        # reads as permanently exhausted once the quota resets
+        obs.QUOTA_EXHAUSTED.labels(model=EMBED_MODEL).set(0)
         if usage is not None:
             usage["embed_calls"] = usage.get("embed_calls", 0) + 1
         out += [_l2_normalize(list(e.values)) for e in r.embeddings]
@@ -141,10 +166,12 @@ async def stream_answer(prompt: str, usage: dict | None = None):
         started = False
         try:
             async with _gate:
-                await _throttle("generate")
+                await _throttle("generate", usage)
                 stream = await client().aio.models.generate_content_stream(
                     model=CHAT_MODEL, contents=prompt
                 )
+                obs.GEMINI_CALLS.labels(op="generate", outcome="ok").inc()
+                obs.QUOTA_EXHAUSTED.labels(model=CHAT_MODEL).set(0)
                 async for part in stream:
                     if usage is not None and part.usage_metadata:
                         _record(usage, part.usage_metadata)
@@ -155,13 +182,17 @@ async def stream_answer(prompt: str, usage: dict | None = None):
         except Exception as e:
             if started:
                 raise
-            await _backoff(e, attempt, 5)
+            await _backoff(e, attempt, 5, "generate", usage)
 
 
 def _record(usage: dict, meta) -> None:
     """Token counts here are reported by the API, not estimated."""
     usage["prompt_tokens"] = meta.prompt_token_count or 0
     usage["completion_tokens"] = meta.candidates_token_count or 0
+    obs.TOKENS.labels(kind="prompt").inc(usage["prompt_tokens"])
+    obs.TOKENS.labels(kind="completion").inc(usage["completion_tokens"])
+    obs.COST.inc(obs.estimate_cost(prompt=usage["prompt_tokens"],
+                                   completion=usage["completion_tokens"]))
 
 
 async def complete(prompt: str, usage: dict | None = None) -> str:
@@ -169,17 +200,19 @@ async def complete(prompt: str, usage: dict | None = None) -> str:
     for attempt in range(5):
         err = None
         async with _gate:
-            await _throttle("generate")
+            await _throttle("generate", usage)
             try:
                 r = await client().aio.models.generate_content(
                     model=CHAT_MODEL, contents=prompt
                 )
+                obs.GEMINI_CALLS.labels(op="generate", outcome="ok").inc()
+                obs.QUOTA_EXHAUSTED.labels(model=CHAT_MODEL).set(0)
                 if usage is not None and r.usage_metadata:
                     _record(usage, r.usage_metadata)
                 return r.text or ""
             except Exception as e:
                 err = e
-        await _backoff(err, attempt, 5)
+        await _backoff(err, attempt, 5, "generate", usage)
     return ""
 
 
@@ -219,6 +252,13 @@ async def _self_check():
     assert eu["embed_tokens_est"] > 0 and eu["embed_calls"] == 1, f"embed usage: {eu}"
     print(f"ok  usage: generation {u['prompt_tokens']}+{u['completion_tokens']} reported, "
           f"embedding {eu['embed_tokens_est']} estimated")
+
+    # a gauge that only ever goes to 1 reports exhaustion forever
+    obs.QUOTA_EXHAUSTED.labels(model=CHAT_MODEL).set(1)
+    await complete("say ok")
+    stuck = obs.QUOTA_EXHAUSTED.labels(model=CHAT_MODEL)._value.get()
+    assert stuck == 0, f"quota gauge did not clear after a success: {stuck}"
+    print("ok  quota gauge clears on a successful call")
     print(f"ok  dim={EMBED_DIM} normalized  related={near:.3f} > unrelated={far:.3f}")
     print(f"ok  streaming: {got.strip()!r}")
 

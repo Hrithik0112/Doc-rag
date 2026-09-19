@@ -1,11 +1,14 @@
 import json
+import logging
 import time
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from . import citations, gemini, ingest, retrieval, stats
+from . import citations, gemini, ingest, obs, retrieval, stats
+
+_log = obs.log("papertrail.query")
 from .db import pool
 from .ratelimit import limit
 
@@ -83,14 +86,23 @@ async def query(q: Query):
         raise HTTPException(400, "Question is empty.")
 
     usage: dict = {}
+    obs.new_request_id()
     t0 = time.monotonic()
     try:
-        hits = await retrieval.search(q.question, q.doc_ids, min(q.top_k, 20), usage=usage)
+        with obs.span("retrieval", corpus_wide=q.doc_ids is None) as retrieval_took:
+            hits = await retrieval.search(
+                q.question, q.doc_ids, min(q.top_k, 20), usage=usage
+            )
     except gemini.QuotaExceeded as e:
+        kind = obs.classify(e)
+        obs.QUERIES.labels(status="quota").inc()
+        obs.event(_log, logging.ERROR, "query failed before retrieval",
+                  error_kind=kind, error=str(e)[:300])
         await stats.log_query(question=q.question, scope_doc_ids=q.doc_ids,
-                              status="quota", error=str(e), **usage)
+                              status="quota", error=str(e), error_kind=kind, **usage)
         raise HTTPException(429, f"Gemini quota exceeded while embedding the question: {e}")
-    retrieval_ms = int((time.monotonic() - t0) * 1000)
+    retrieval_ms = retrieval_took["ms"]
+    obs.QUERY_SECONDS.labels(stage="retrieval").observe(retrieval_ms / 1000)
 
     async def stream():
         def sse(event, data):
@@ -103,6 +115,8 @@ async def query(q: Query):
             yield sse("token", "I have no indexed passages to answer from. "
                                 "Upload a document, or wait for processing to finish.")
             yield sse("done", {"unverified_citations": []})
+            obs.QUERIES.labels(status="no_hits").inc()
+            obs.event(_log, logging.WARNING, "no passages matched", question=q.question[:120])
             await stats.log_query(question=q.question, scope_doc_ids=q.doc_ids,
                                   status="no_hits", retrieval_ms=retrieval_ms,
                                   **summary, **usage)
@@ -126,32 +140,47 @@ async def query(q: Query):
             ):
                 parts.append(tok)
                 yield sse("token", tok)
-        except gemini.QuotaExceeded as e:
-            yield sse("error", f"Gemini free-tier quota exceeded: {e}")
+        except (gemini.QuotaExceeded, Exception) as e:  # noqa: BLE001 -- stream is open
+            quota = isinstance(e, gemini.QuotaExceeded)
+            kind = obs.classify(e)
+            status = "quota" if quota else "error"
+            yield sse("error", f"Gemini free-tier quota exceeded: {e}" if quota
+                      else f"Generation failed: {e}")
+            obs.QUERIES.labels(status=status).inc()
+            obs.event(_log, logging.ERROR, "generation failed",
+                      error_kind=kind, error=str(e)[:300])
             await stats.log_query(question=q.question, scope_doc_ids=q.doc_ids,
-                                  status="quota", error=str(e),
-                                  retrieval_ms=retrieval_ms,
-                                  generation_ms=int((time.monotonic() - g0) * 1000),
-                                  **summary, **usage)
-            return
-        except Exception as e:  # noqa: BLE001 -- the stream is already open
-            yield sse("error", f"Generation failed: {e}")
-            await stats.log_query(question=q.question, scope_doc_ids=q.doc_ids,
-                                  status="error", error=str(e),
+                                  status=status, error=str(e), error_kind=kind,
                                   retrieval_ms=retrieval_ms,
                                   generation_ms=int((time.monotonic() - g0) * 1000),
                                   **summary, **usage)
             return
 
         answer = "".join(parts)
-        unverified = citations.verify(answer, hits)
+        generation_ms = int((time.monotonic() - g0) * 1000)
+        with obs.span("verify") as verify_took:
+            unverified = citations.verify(answer, hits)
+            n_cites = len(citations.parse(answer))
         yield sse("done", {"unverified_citations": unverified})
+
+        obs.QUERIES.labels(status="ok").inc()
+        obs.QUERY_SECONDS.labels(stage="generation").observe(generation_ms / 1000)
+        obs.QUERY_SECONDS.labels(stage="total").observe((time.monotonic() - t0))
+        obs.CITATIONS.labels(verified="true").inc(n_cites - len(unverified))
+        obs.CITATIONS.labels(verified="false").inc(len(unverified))
+        obs.event(_log, logging.INFO, "answered",
+                  hits=len(hits), citations=n_cites, unverified=len(unverified),
+                  retrieval_ms=retrieval_ms, generation_ms=generation_ms,
+                  prompt_tokens=usage.get("prompt_tokens", 0),
+                  completion_tokens=usage.get("completion_tokens", 0),
+                  retries=usage.get("retries", 0),
+                  throttle_ms=usage.get("throttle_ms", 0))
 
         await stats.log_query(
             question=q.question, scope_doc_ids=q.doc_ids, status="ok",
-            retrieval_ms=retrieval_ms,
-            generation_ms=int((time.monotonic() - g0) * 1000),
-            n_citations=len(citations.parse(answer)), n_unverified=len(unverified),
+            retrieval_ms=retrieval_ms, generation_ms=generation_ms,
+            verify_ms=verify_took["ms"],
+            n_citations=n_cites, n_unverified=len(unverified),
             **summary, **usage,
         )
 
@@ -180,6 +209,11 @@ async def stats_queries(limit: int = 25):
 @router.get("/stats/scores")
 async def stats_scores():
     return await stats.score_buckets()
+
+
+@router.get("/stats/errors")
+async def stats_errors():
+    return await stats.error_breakdown()
 
 
 @router.get("/stats/evals")

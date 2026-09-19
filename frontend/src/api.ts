@@ -99,7 +99,16 @@ export type Overview = {
   retrieval_ms_p50: number | null; retrieval_ms_p95: number | null
   generation_ms_p50: number | null; generation_ms_p95: number | null
   hits_vector_only: number; hits_keyword_only: number; hits_both_arms: number
+  query_cost_usd: number; ingest_cost_usd: number
+  retries: number; throttle_ms: number
+  embed_ms_p50: number | null; search_ms_p50: number | null; n_staged: number
   embed_model: string; chat_model: string
+}
+
+export type ErrorKind = {
+  kind: string
+  queries: number
+  documents: number
 }
 
 export type DayPoint = {
@@ -116,6 +125,9 @@ export type QueryRow = {
   prompt_tokens: number; completion_tokens: number; embed_tokens_est: number
   retrieval_ms: number; generation_ms: number; created_at: string
   corpus_wide: boolean
+  request_id: string | null; error_kind: string | null
+  embed_ms: number; search_ms: number; verify_ms: number
+  retries: number; throttle_ms: number; est_cost_usd: number
 }
 
 export type EvalRun = {
@@ -136,3 +148,4 @@ export const getTimeseries = (days = 14) => get<DayPoint[]>(`/stats/timeseries?d
 export const getScoreBuckets = () => get<ScoreBucket[]>('/stats/scores')
 export const getRecentQueries = (limit = 25) => get<QueryRow[]>(`/stats/queries?limit=${limit}`)
 export const getEvalRuns = () => get<EvalRun[]>('/stats/evals')
+export const getErrorKinds = () => get<ErrorKind[]>('/stats/errors')

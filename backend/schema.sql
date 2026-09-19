@@ -96,3 +96,34 @@ CREATE INDEX IF NOT EXISTS eval_runs_created_idx ON eval_runs (created_at DESC);
 
 ALTER TABLE documents ADD COLUMN IF NOT EXISTS embed_tokens_est INT NOT NULL DEFAULT 0;
 ALTER TABLE documents ADD COLUMN IF NOT EXISTS indexed_ms       INT NOT NULL DEFAULT 0;
+
+-- ── observability ────────────────────────────────────────────────────────
+-- Free-text error strings cannot be counted or alerted on. Every failure maps
+-- to one bucket; see backend/obs.py for the taxonomy and its self-check.
+DO $$ BEGIN
+  CREATE TYPE error_kind AS ENUM (
+    'quota_daily','quota_per_minute','upstream','timeout',
+    'no_extractable_text','bad_input','database','unknown');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+ALTER TABLE queries ADD COLUMN IF NOT EXISTS request_id  TEXT;
+ALTER TABLE queries ADD COLUMN IF NOT EXISTS trace_id    TEXT;
+ALTER TABLE queries ADD COLUMN IF NOT EXISTS error_kind  error_kind;
+-- retrieval_ms bundled the embed round trip with the SQL; these split it
+ALTER TABLE queries ADD COLUMN IF NOT EXISTS embed_ms    INT NOT NULL DEFAULT 0;
+ALTER TABLE queries ADD COLUMN IF NOT EXISTS search_ms   INT NOT NULL DEFAULT 0;
+ALTER TABLE queries ADD COLUMN IF NOT EXISTS verify_ms   INT NOT NULL DEFAULT 0;
+ALTER TABLE queries ADD COLUMN IF NOT EXISTS retries     INT NOT NULL DEFAULT 0;
+ALTER TABLE queries ADD COLUMN IF NOT EXISTS throttle_ms INT NOT NULL DEFAULT 0;
+-- what this WOULD cost on the paid tier; the free tier bills nothing
+ALTER TABLE queries ADD COLUMN IF NOT EXISTS est_cost_usd NUMERIC(12,8) NOT NULL DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS queries_error_kind_idx ON queries (error_kind)
+  WHERE error_kind IS NOT NULL;
+
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS error_kind   error_kind;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS parse_ms     INT NOT NULL DEFAULT 0;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS chunk_ms     INT NOT NULL DEFAULT 0;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS embed_retries INT NOT NULL DEFAULT 0;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS throttle_ms  INT NOT NULL DEFAULT 0;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS est_cost_usd NUMERIC(12,8) NOT NULL DEFAULT 0;
