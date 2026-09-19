@@ -53,15 +53,27 @@ would need one before this ran for anyone else.
 
 ## Interface
 
-Three screens reached from a magnetic dock: a landing page at `/`, `#ask`, and
-`#instrumentation`. An ambient grain field sits behind the work with glass panels over it.
+Three screens: a landing page at `/`, `#ask`, and `#instrumentation`, reached from a plain
+nav bar. The working screens are flat and quiet. The landing page is the only one with
+weather.
 
-The landing page has one job: show the product's core gesture rather than describe it. A
-real answer with numbered citations you can open. It prefers a question this instance
-actually answered, and falls back to a worked example **labelled as an example**, because
-a landing page for a tool about provenance should not pass invented output off as real.
-The passages it lists carry the fusion score and which retrieval arm found them, not
-quoted text, because the query log deliberately never stores passage contents.
+**Typography.** Three faces, one job each. `Instrument Serif` is display only, set large
+with tight tracking; it ships a single weight and a high-contrast cut that falls apart at
+body size. `Newsreader` is the reading surface, which is every answer and question.
+`Archivo` is the interface.
+
+**The landing page** has one job: show the core gesture rather than describe it. An answer
+with numbered citations you can open, then the same thing failing. It prefers a question
+this instance actually answered, and falls back to a worked example **labelled as an
+example**, because a landing page for a tool about provenance should not pass invented
+output off as a real answer. The passages it lists carry the fusion score and which
+retrieval arm matched, not quoted text, because the query log deliberately never stores
+passage contents.
+
+A WebGL aurora runs behind the hero. Its scrim is horizontal rather than a flat overlay:
+the copy is left-aligned, so solid ground sits under the text while the gradient stays
+vivid on the right where nothing has to be read. A flat overlay dark enough for contrast
+just hides the gradient.
 
 **Dark and light, with a toggle.** The theme is resolved by an inline script in
 `index.html` before first paint, so there is no flash, and `<html data-theme>` is the
@@ -70,20 +82,14 @@ single source of truth. Tailwind's `dark:` variant is rebound to that attribute 
 rather than the operating system. The choice persists in `localStorage`; with no stored
 choice it follows the OS and keeps following it.
 
-Motion is rationed. The one mechanical moment is the lead figure on the dashboard, which
-flips like a departure board; everything else stays still so that movement keeps its
-meaning. `prefers-reduced-motion` is respected throughout.
-
-Several pieces come from the [Componentry](https://componentry.dev) registry, wired in as
-a shadcn registry in `frontend/components.json`:
+Components from the [Componentry](https://componentry.dev) registry, wired in through
+`frontend/components.json`:
 
 | Component | Used for |
 |---|---|
-| `split-flap-display` | the grounding rate, the number that matters most |
+| `aurora-flow` | the hero background |
+| `split-flap-display` | the grounding rate on the dashboard |
 | `github-calendar` | daily question activity |
-| `magnetic-dock` | navigation |
-| `grain-gradient` | the ambient field |
-| `kinetic-text-reveal` | the wordmark |
 
 `github-calendar` is adapted. It shipped fetching a GitHub username from a third-party
 API; this app has its own activity to show and should not be making external calls, so it
@@ -91,7 +97,7 @@ takes the days directly and buckets them locally. Its window grows from twelve w
 toward a year as history accumulates, because a full-year grid with one active day is
 mostly dead space and padding it with invented history would be worse.
 
-To pull more components:
+To pull more:
 
 ```bash
 cd frontend && npx shadcn@latest add @componentry/<name>

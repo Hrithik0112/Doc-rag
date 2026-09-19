@@ -168,6 +168,10 @@
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
 
+  /* Three faces with one job each: Instrument Serif is display only (it ships a
+     single weight and a high-contrast cut that falls apart at body size),
+     Newsreader is the reading surface, Archivo is the interface. */
+  --font-display: 'Instrument Serif', 'Newsreader', Georgia, serif;
   --font-serif: 'Newsreader', Georgia, serif;
   --font-sans: 'Archivo', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
