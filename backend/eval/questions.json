@@ -1,0 +1,177 @@
+[
+  {
+    "file": "attention.pdf",
+    "question": "How many identical layers are in the encoder stack?",
+    "expected_pages": [
+      3
+    ],
+    "expected_answer": "Six (N = 6)."
+  },
+  {
+    "file": "attention.pdf",
+    "question": "What is the dimension d_model of the model's embeddings and sublayer outputs?",
+    "expected_pages": [
+      3,
+      5
+    ],
+    "expected_answer": "512."
+  },
+  {
+    "file": "attention.pdf",
+    "question": "How many attention heads does the base Transformer use?",
+    "expected_pages": [
+      5
+    ],
+    "expected_answer": "Eight parallel attention heads."
+  },
+  {
+    "file": "attention.pdf",
+    "question": "What is the dimensionality of the inner layer of the position-wise feed-forward network?",
+    "expected_pages": [
+      5
+    ],
+    "expected_answer": "2048."
+  },
+  {
+    "file": "attention.pdf",
+    "question": "What function is used for positional encoding?",
+    "expected_pages": [
+      6
+    ],
+    "expected_answer": "Sine and cosine functions of different frequencies."
+  },
+  {
+    "file": "attention.pdf",
+    "question": "What optimizer was used to train the Transformer, and with what beta values?",
+    "expected_pages": [
+      7
+    ],
+    "expected_answer": "Adam, with beta1 = 0.9, beta2 = 0.98 and epsilon = 1e-9."
+  },
+  {
+    "file": "attention.pdf",
+    "question": "What BLEU score did the big Transformer achieve on WMT 2014 English-to-German?",
+    "expected_pages": [
+      1,
+      8
+    ],
+    "expected_answer": "28.4 BLEU."
+  },
+  {
+    "file": "attention.pdf",
+    "question": "What dropout rate was used for the base model?",
+    "expected_pages": [
+      8
+    ],
+    "expected_answer": "P_drop = 0.1."
+  },
+  {
+    "file": "attention.pdf",
+    "question": "What value of label smoothing was used during training?",
+    "expected_pages": [
+      8
+    ],
+    "expected_answer": "Label smoothing of 0.1."
+  },
+  {
+    "file": "attention.pdf",
+    "question": "How long did the base models train and on what hardware?",
+    "expected_pages": [
+      7
+    ],
+    "expected_answer": "100,000 steps over 12 hours on 8 NVIDIA P100 GPUs."
+  },
+  {
+    "file": "attention.pdf",
+    "question": "How is scaled dot-product attention scaled?",
+    "expected_pages": [
+      4
+    ],
+    "expected_answer": "Dot products are divided by the square root of d_k."
+  },
+  {
+    "file": "bert.pdf",
+    "question": "What does the acronym BERT stand for?",
+    "expected_pages": [
+      1
+    ],
+    "expected_answer": "Bidirectional Encoder Representations from Transformers."
+  },
+  {
+    "file": "bert.pdf",
+    "question": "What two unsupervised tasks is BERT pre-trained on?",
+    "expected_pages": [
+      2,
+      4,
+      8,
+      13
+    ],
+    "expected_answer": "A masked language model task and next sentence prediction."
+  },
+  {
+    "file": "bert.pdf",
+    "question": "What percentage of WordPiece tokens are masked during pre-training?",
+    "expected_pages": [
+      4
+    ],
+    "expected_answer": "15%."
+  },
+  {
+    "file": "bert.pdf",
+    "question": "What GLUE score did BERT-large achieve?",
+    "expected_pages": [
+      1,
+      6
+    ],
+    "expected_answer": "80.5."
+  },
+  {
+    "file": "bert.pdf",
+    "question": "What are the layer, hidden size and head counts for BERT-base?",
+    "expected_pages": [
+      3
+    ],
+    "expected_answer": "12 layers, hidden size 768, 12 attention heads."
+  },
+  {
+    "file": "bert.pdf",
+    "question": "What corpora were used for BERT's pre-training?",
+    "expected_pages": [
+      5,
+      14
+    ],
+    "expected_answer": "BooksCorpus (800M words) and English Wikipedia (2,500M words)."
+  },
+  {
+    "file": "bert.pdf",
+    "question": "What special token is used for classification, and what separates sentence pairs?",
+    "expected_pages": [
+      3,
+      4,
+      5,
+      7,
+      13,
+      14,
+      15
+    ],
+    "expected_answer": "[CLS] begins every sequence; [SEP] separates sentence pairs."
+  },
+  {
+    "file": "bert.pdf",
+    "question": "What F1 score did BERT achieve on SQuAD v1.1 test?",
+    "expected_pages": [
+      1,
+      6,
+      7
+    ],
+    "expected_answer": "93.2 F1."
+  },
+  {
+    "file": "bert.pdf",
+    "question": "What vocabulary size is used for the WordPiece embeddings?",
+    "expected_pages": [
+      4
+    ],
+    "expected_answer": "A 30,000 token WordPiece vocabulary."
+  }
+]

@@ -1,1 +1,119 @@
-# Doc-rag
+# PaperTrail
+
+Ask questions about your PDFs and get answers that show where they came from.
+
+Every answer is written only from passages retrieved out of your documents, each
+passage is listed beside the text, and any citation the model produces that does
+not match a retrieved passage is flagged rather than hidden.
+
+## What is actually interesting here
+
+Most "chat with your PDF" projects stop at: embed, search by vector, ask the model.
+Four decisions separate this from that.
+
+**Hybrid retrieval.** Vector search finds paraphrase but misses exact strings, which
+is a problem when people ask about dates, figures and model names. PaperTrail runs a
+pgvector cosine search and a Postgres full-text search in one query and fuses them
+with Reciprocal Rank Fusion. RRF needs no tuning and no score normalization between
+two incomparable scales. Measured effect is in `backend/eval/`.
+
+**Citations are verified, not trusted.** After the answer streams, every `[Page N]`
+it emitted is checked against the passages actually retrieved. Unmatched citations
+come back in the response and render in red beside the answer. Across documents the
+label includes the filename, because page 7 of one paper is not page 7 of another.
+
+**Ingestion is resumable by construction.** Chunks are written to Postgres with a
+NULL embedding *before* any API call. A chunk without an embedding is unfinished
+work, so hitting the free-tier daily cap halfway through a document costs nothing:
+`POST /documents/{id}/resume` continues from the exact passage it stopped on.
+
+**No vector index, on purpose.** Exact search over tens of thousands of chunks takes
+milliseconds and is 100% accurate. An approximate index would also fight the
+`document_id` filter and silently lose recall. `backend/add_index.sql` has the HNSW
+statement for when there is enough data to need it.
+
+## Running it
+
+Requires Docker, Python 3.11+, Node 20+, and a Gemini API key from
+https://aistudio.google.com/apikey (free, no credit card).
+
+```bash
+cp .env.example .env          # then paste your key into GEMINI_API_KEY
+docker compose up -d          # Postgres with pgvector on port 5433
+
+python3 -m venv .venv
+./.venv/bin/pip install -r requirements.txt
+./.venv/bin/uvicorn backend.main:app --reload --port 8000
+
+cd frontend && npm install && npm run dev      # http://localhost:5173
+```
+
+The schema is applied automatically on first boot.
+
+### Free-tier quotas, which are the main thing that will bite you
+
+Gemini's free limits are **per model** and vary by more than an order of magnitude.
+`gemini-3.5-flash` allows only 20 generate requests *per day*; the `-lite` models
+allow far more, which is why `CHAT_MODEL` defaults to `gemini-3.5-flash-lite`.
+
+The two 429s mean different things and the code treats them differently: a
+per-minute 429 carries a `retryDelay` and is simply waited out, while a per-day 429
+is terminal and checkpoints the document for later resume. Conflating them makes the
+whole free tier look broken.
+
+`-lite` is also a weaker reader. It will occasionally misread a table that the
+retrieval step found correctly. If you have a paid key, set `CHAT_MODEL` to a full
+Flash model and re-run the eval to see the difference.
+
+## Checks
+
+Each module carries one runnable check. No test framework.
+
+```bash
+./.venv/bin/python -m backend.gemini      # 768 dims, L2-normalized, quota classifier
+./.venv/bin/python -m backend.ingest      # chunk sizing, page scoping, overlap
+./.venv/bin/python -m backend.citations   # citation parsing and verification
+./.venv/bin/python -m backend.retrieval   # proves hybrid: exact string AND paraphrase
+```
+
+`backend.retrieval` is the one that matters: it inserts a passage containing a rare
+exact string and asserts both that keyword search retrieves it and that a paraphrased
+question retrieves a different passage by meaning. It fails if either arm of the
+hybrid, or the fusion, regresses.
+
+The embedding normalization assert is the other one worth keeping. `gemini-embedding-001`
+does not normalize when `output_dimensionality` is not 3072, and unnormalized vectors
+make cosine ranking quietly wrong rather than obviously broken.
+
+## Evaluation
+
+20 questions across two papers. Gold page labels are derived by locating anchor text
+in the PDFs, not written from memory.
+
+```bash
+./.venv/bin/python -m backend.eval.run_eval                  # full
+./.venv/bin/python -m backend.eval.run_eval --retrieval-only # no generation quota spent
+```
+
+Latest run, `gemini-embedding-001` at 768 dimensions and `gemini-3.5-flash-lite`:
+
+```
+Retrieval recall@5
+  vector only    19/20 (95%)
+  hybrid         20/20 (100%)
+  delta          +1 questions
+
+Answer quality (hybrid retrieval, graded by Gemini)
+  correct        20/20 (100%)
+  citations traced to a retrieved passage   20/20 (100%)
+```
+
+The hybrid delta is one question, not a landslide. These are mostly
+paraphrase-friendly questions about two well-written papers; the gap widens on
+documents full of identifiers, part numbers and dates.
+
+## Not built
+
+Authentication, multi-user isolation, a background worker, a reranker, query
+rewriting, conversation memory across turns, and OCR for scanned PDFs. `ponytail:`
+comments in the source mark the deliberate ceilings and what replaces them.
