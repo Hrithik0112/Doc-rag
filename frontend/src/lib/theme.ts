@@ -37,3 +37,19 @@ export function useTheme() {
 
   return { theme, toggle }
 }
+
+/** WebGL animation runs on requestAnimationFrame, which a CSS
+ *  prefers-reduced-motion rule cannot stop. Anything canvas-based has to check
+ *  this itself and render something still instead. */
+export function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(
+    () => matchMedia('(prefers-reduced-motion: reduce)').matches,
+  )
+  useEffect(() => {
+    const mq = matchMedia('(prefers-reduced-motion: reduce)')
+    const on = () => setReduced(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return reduced
+}

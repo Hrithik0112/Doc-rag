@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { AuroraFlow } from '@/components/ui/aurora-flow'
+import { AnimatedGradient } from '@/components/ui/animated-gradient'
 import { getOverview, getRecentQueries, type Overview, type QueryRow } from '../api'
 import { compact } from '../lib/format'
-import { useTheme } from '../lib/theme'
+import { usePrefersReducedMotion, useTheme } from '../lib/theme'
 
 /** A worked example, used only when this instance has answered nothing yet. It
  *  is labelled as an example on screen, because a landing page for a tool about
@@ -20,6 +20,7 @@ const SAMPLE = {
 
 export function Landing() {
   const { theme } = useTheme()
+  const reducedMotion = usePrefersReducedMotion()
   const [stats, setStats] = useState<Overview | null>(null)
   const [latest, setLatest] = useState<QueryRow | null>(null)
   const [open, setOpen] = useState<number | null>(1)
@@ -47,50 +48,99 @@ export function Landing() {
   }
   const shown = real ?? SAMPLE
 
-  // The aurora is the landing page's own weather. The working screens stay flat.
-  const aurora =
+  /* The landing page's own weather; the working screens stay flat.
+     Two configs rather than one with swapped colours: the light ground has far
+     less room, so it runs slower, softer and with less distortion, or the
+     motion reads as a smear across the paper instead of light moving over it. */
+  const gradient =
     theme === 'dark'
-      ? ['#0d1219', '#1d2b3a', '#8a6a22', '#d6a447', '#00a98a']
-      : ['#f5f3ef', '#e8dcc0', '#d2ae6b', '#b98f3f', '#fffdf9']
+      ? {
+          preset: 'custom' as const,
+          color1: '#0d1219',
+          color2: '#14384a',
+          color3: '#d6a447',
+          rotation: -38,
+          proportion: 52,
+          scale: 0.7,
+          speed: 14,
+          distortion: 38,
+          swirl: 72,
+          swirlIterations: 9,
+          softness: 95,
+          offset: 180,
+          shape: 'Edge' as const,
+          shapeSize: 55,
+        }
+      : {
+          preset: 'custom' as const,
+          color1: '#f5f3ef',
+          color2: '#e4d3ac',
+          color3: '#b8913f',
+          rotation: -38,
+          proportion: 58,
+          scale: 0.85,
+          speed: 9,
+          distortion: 22,
+          swirl: 48,
+          swirlIterations: 7,
+          softness: 100,
+          offset: 140,
+          shape: 'Edge' as const,
+          shapeSize: 60,
+        }
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       {/* ── hero ─────────────────────────────────────────────────────── */}
       <section className="relative isolate overflow-hidden border-b border-hair">
-        <AuroraFlow
-          colors={aurora}
-          className="pointer-events-none absolute inset-0 -z-10"
-          speed={0.35}
-          animationSpeed={0.4}
-          intensity={theme === 'dark' ? 1.15 : 1.25}
-          opacity={1}
-          blur={38}
-          layers={4}
-          grain
-          grainOpacity={theme === 'dark' ? 0.09 : 0.05}
-          vignette
-          vignetteStrength={theme === 'dark' ? 0.4 : 0.25}
-          pointerInteraction
-          pointerStrength={0.16}
-        />
-        {/* The scrim runs horizontally, not over everything: the copy is
-            left-aligned, so it keeps solid ground under the text while the
-            aurora stays vivid on the right where nothing has to be read.
-            A flat overlay dark enough for contrast just hides the gradient. */}
-        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-void via-void/75 to-transparent" />
+{/* The gradient lives in the right half and fades in through a mask,
+            rather than being covered by a scrim over the whole hero. A scrim
+            wide enough to protect 6rem type leaves a visible vertical seam
+            where its ramp begins; a mask has no edge to see. The copy then sits
+            on the page's own ground, so its contrast is the token contrast and
+            does not depend on where the gradient is bright this second. */}
+        <div
+          className="pointer-events-none absolute inset-y-0 right-0 -z-10 w-[55%] max-lg:w-[72%]"
+          style={{
+            maskImage:
+              'linear-gradient(to right, transparent 0%, rgba(0,0,0,.45) 30%, #000 62%)',
+            WebkitMaskImage:
+              'linear-gradient(to right, transparent 0%, rgba(0,0,0,.45) 30%, #000 62%)',
+          }}
+          aria-hidden
+        >
+          {reducedMotion ? (
+            // A still gradient in the same colours, rather than a canvas
+            // looping forever for someone who asked it not to.
+            <div
+              className="size-full"
+              style={{
+                background: `linear-gradient(142deg, ${gradient.color1} 0%, ${gradient.color2} 45%, ${gradient.color3} 100%)`,
+              }}
+            />
+          ) : (
+            <AnimatedGradient
+              key={theme}
+              config={gradient}
+              noise={{ opacity: theme === 'dark' ? 0.07 : 0.04, scale: 0.6 }}
+              className="size-full"
+            />
+          )}
+        </div>
+
         <div className="absolute inset-x-0 bottom-0 -z-10 h-24 bg-gradient-to-t from-void to-transparent" />
 
-        <div className="mx-auto max-w-5xl px-8 py-28 max-sm:px-5 max-sm:py-20">
+        <div className="mx-auto max-w-5xl px-8 py-28 max-sm:px-5 max-sm:py-20 lg:max-w-6xl">
           <p className="mb-7 flex items-center gap-2.5 text-xs text-dim">
             <span className="size-1.5 rounded-full bg-glow" aria-hidden />
             Ask your documents. Check the answer.
           </p>
 
-          <h1 className="max-w-[16ch] font-display text-[clamp(3rem,8.5vw,6.5rem)] font-normal leading-[0.94] tracking-[-0.025em]">
+          <h1 className="max-w-[13ch] font-display text-[clamp(2.75rem,6.4vw,5rem)] font-normal leading-[0.96] tracking-[-0.022em]">
             Every claim, traced to the page it came from.
           </h1>
 
-          <p className="mt-9 max-w-xl text-lg leading-relaxed text-dim">
+          <p className="mt-9 max-w-lg text-lg leading-relaxed text-dim">
             PaperTrail answers only from passages it retrieved, lists every one beside the
             text, and marks any citation it cannot verify. Including its own.
           </p>

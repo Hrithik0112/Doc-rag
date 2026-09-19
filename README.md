@@ -70,10 +70,20 @@ output off as a real answer. The passages it lists carry the fusion score and wh
 retrieval arm matched, not quoted text, because the query log deliberately never stores
 passage contents.
 
-A WebGL aurora runs behind the hero. Its scrim is horizontal rather than a flat overlay:
-the copy is left-aligned, so solid ground sits under the text while the gradient stays
-vivid on the right where nothing has to be read. A flat overlay dark enough for contrast
-just hides the gradient.
+A WebGL gradient flows behind the right half of the hero. It is **masked in** rather than
+covered by a scrim: a scrim wide enough to protect display type leaves a visible vertical
+seam where its ramp begins, and a scrim dark enough for contrast simply hides the
+gradient. Masking has no edge to see, and it leaves the copy sitting on the page's own
+ground, so the text's contrast is the token contrast rather than a function of wherever
+the gradient happens to be bright that second.
+
+Two configs rather than one with swapped colours. The light ground has far less room, so
+it runs slower and with less distortion, or the motion reads as a smear across the paper
+instead of light moving over it.
+
+A canvas animation loops on `requestAnimationFrame`, which a CSS `prefers-reduced-motion`
+rule cannot stop, so the component checks the query itself and renders a still gradient in
+the same colours instead.
 
 **Dark and light, with a toggle.** The theme is resolved by an inline script in
 `index.html` before first paint, so there is no flash, and `<html data-theme>` is the
