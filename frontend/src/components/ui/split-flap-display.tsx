@@ -328,10 +328,11 @@ export function SplitFlapDisplay({
           className
         )}
         style={{
-          background: "linear-gradient(145deg, #0c0c0c 0%, #080808 50%, #0a0a0a 100%)",
-          border: "1px solid rgba(255,255,255,0.06)",
-          boxShadow:
-            "0 20px 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.03), inset 0 1px 0 rgba(255,255,255,0.04)",
+          // themed chassis: a departure board is black, but a black slab on a
+          // light page is a hole rather than an object
+          background: "var(--flap-chassis)",
+          border: "1px solid var(--flap-edge)",
+          boxShadow: "var(--flap-shadow)",
         }}
       >
         <FlapRow
@@ -355,8 +356,8 @@ export function SplitFlapDisplay({
         className
       )}
       style={{
-        background: "linear-gradient(145deg, #0c0c0c 0%, #080808 50%, #0a0a0a 100%)",
-        border: "1px solid rgba(255,255,255,0.06)",
+        background: "var(--flap-chassis)",
+        border: "1px solid var(--flap-edge)",
         boxShadow:
           "0 25px 80px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.03), inset 0 1px 0 rgba(255,255,255,0.04)",
       }}

@@ -118,10 +118,9 @@ function DockItem({
             <motion.div
                 className={cn(
                     "relative w-full h-full rounded-2xl overflow-hidden",
-                    "bg-gradient-to-b from-neutral-100 to-neutral-50",
-                    "dark:from-neutral-800 dark:to-neutral-900",
+                    "bg-gradient-to-b from-raised to-panel",
                     "backdrop-blur-sm",
-                    "border border-neutral-300 dark:border-neutral-700",
+                    "border border-hair",
                     "shadow-lg shadow-black/10 dark:shadow-black/30",
                     "flex items-center justify-center",
                     "transition-colors duration-200"
@@ -133,7 +132,7 @@ function DockItem({
                 }}
             >
                 {/* Icon */}
-                <div aria-hidden="true" className="w-[60%] h-[60%] flex items-center justify-center text-neutral-700 dark:text-white">
+                <div aria-hidden="true" className="w-[60%] h-[60%] flex items-center justify-center text-dim">
                     {item.icon}
                 </div>
 
@@ -201,7 +200,7 @@ function DockItem({
                             "px-3 py-1.5 rounded-lg",
                             "bg-white dark:bg-neutral-900/95",
                             "backdrop-blur-sm",
-                            "text-neutral-800 dark:text-white text-sm font-medium whitespace-nowrap",
+                            "text-text text-sm font-medium whitespace-nowrap",
                             "border border-neutral-200 dark:border-white/10",
                             "shadow-xl shadow-black/10 dark:shadow-black/20",
                             "pointer-events-none z-50"
@@ -266,14 +265,11 @@ function MagneticDock({
 
     const variantStyles = {
         glass: cn(
-            "bg-white/80 dark:bg-neutral-900/80",
+            "bg-panel/80",
             "backdrop-blur-xl backdrop-saturate-150",
-            "border border-neutral-200 dark:border-neutral-700"
+            "border border-hair"
         ),
-        solid: cn(
-            "bg-neutral-100 dark:bg-neutral-900",
-            "border border-neutral-300 dark:border-neutral-700"
-        ),
+        solid: cn("bg-panel", "border border-hair"),
         transparent: "bg-transparent border-0",
     }
 

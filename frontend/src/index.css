@@ -1,5 +1,10 @@
 @import 'tailwindcss';
 
+/* Point Tailwind's `dark:` variant at our attribute instead of the OS media
+   query, so every registry component that ships `dark:` classes follows the
+   toggle rather than the operating system. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
 /* ── design tokens ───────────────────────────────────────────────────────
    Dark-first. The archival identity survives in the type and the hairlines;
    the surfaces and the accent are new.
@@ -11,6 +16,8 @@
    protanopes. Do not swap one without re-validating the whole set. */
 
 :root {
+  color-scheme: dark;
+
   --void:   #070a0d;   /* page */
   --panel:  #10171c;   /* raised surface, and the chart surface */
   --raised: #162027;   /* inputs, hovers */
@@ -54,6 +61,61 @@
   --good:     #00b98d;
   --warning:  #d9a520;
   --critical: #f06a5e;
+
+  /* activity grid: sequential, one hue light-to-dark, stepped per theme */
+  --flap-chassis: linear-gradient(145deg, #0c0c0c 0%, #080808 50%, #0a0a0a 100%);
+  --flap-edge: rgba(255, 255, 255, .06);
+  --flap-shadow: 0 20px 60px rgba(0, 0, 0, .8), inset 0 1px 0 rgba(255, 255, 255, .04);
+
+  --act-0: #131c22;
+  --act-1: #0d5744;
+  --act-2: #008866;
+  --act-3: #00ab84;
+  --act-4: #2fe0b0;
+}
+
+/* ── light ───────────────────────────────────────────────────────────────
+   A separate validated palette, not an inversion. The chart hues are the
+   light set (checked against the board surface); reusing the dark hues here
+   would drop below the contrast floor. Three slots in both themes. */
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --void:   #f2f4f3;
+  --panel:  #fbfcfb;
+  --raised: #eaeeec;
+  --hair:   #d3d9d7;
+  --halo:   #b4c0bc;
+
+  --text:   #16202b;
+  --dim:    #55635f;
+  --faint:  #7c8a86;
+
+  --accent:      #00806a;
+  --accent-deep: #006b58;
+
+  --primary-foreground: #ffffff;
+  --destructive: #c02a24;
+
+  --chart-1: #00997c;
+  --chart-2: #3a5ae0;
+  --chart-3: #b8730c;
+
+  --good:     #00806a;
+  --warning:  #a87f00;
+  --critical: #c02a24;
+
+  --flap-chassis: linear-gradient(145deg, #2b3339 0%, #202730 50%, #262e34 100%);
+  --flap-edge: rgba(0, 0, 0, .18);
+  --flap-shadow: 0 10px 28px -14px rgba(22, 32, 43, .5), inset 0 1px 0 rgba(255, 255, 255, .07);
+
+  /* empty cells need to read as cells, not as background, on a light ground */
+  --act-0: #dbe2df;
+  --act-1: #a8ddcd;
+  --act-2: #5cbfa2;
+  --act-3: #1c9a79;
+  --act-4: #00705c;
 }
 
 @theme inline {
@@ -146,6 +208,13 @@
     background: color-mix(in oklab, var(--panel) 72%, transparent);
     backdrop-filter: blur(14px) saturate(120%);
     border: 1px solid var(--hair);
+  }
+
+  /* Glow is a dark-mode device. On a light ground it turns into haze, so the
+     same classes fall back to a plain hairline and honest text. */
+  :root[data-theme='light'] .glow-text { text-shadow: none; }
+  :root[data-theme='light'] .glow-ring {
+    box-shadow: 0 1px 2px rgba(22, 32, 43, .06), 0 0 0 1px var(--hair);
   }
 
   .glow-text { text-shadow: 0 0 28px color-mix(in oklab, currentColor 45%, transparent); }

@@ -53,8 +53,22 @@ would need one before this ran for anyone else.
 
 ## Interface
 
-Dark, with an ambient grain field behind the work and glass panels over it. Two screens,
-`#ask` and `#instrumentation`, reached from a magnetic dock.
+Three screens reached from a magnetic dock: a landing page at `/`, `#ask`, and
+`#instrumentation`. An ambient grain field sits behind the work with glass panels over it.
+
+The landing page has one job: show the product's core gesture rather than describe it. A
+real answer with numbered citations you can open. It prefers a question this instance
+actually answered, and falls back to a worked example **labelled as an example**, because
+a landing page for a tool about provenance should not pass invented output off as real.
+The passages it lists carry the fusion score and which retrieval arm found them, not
+quoted text, because the query log deliberately never stores passage contents.
+
+**Dark and light, with a toggle.** The theme is resolved by an inline script in
+`index.html` before first paint, so there is no flash, and `<html data-theme>` is the
+single source of truth. Tailwind's `dark:` variant is rebound to that attribute with
+`@custom-variant`, so registry components that ship `dark:` classes follow the toggle
+rather than the operating system. The choice persists in `localStorage`; with no stored
+choice it follows the OS and keeps following it.
 
 Motion is rationed. The one mechanical moment is the lead figure on the dashboard, which
 flips like a departure board; everything else stays still so that movement keeps its
@@ -172,17 +186,26 @@ documents full of identifiers, part numbers and dates.
 
 ## Colour
 
-There are two validated palettes in this repo's history, and the dark one is not a
-brightened copy of the light one. Dark mode was stepped separately and re-validated,
-because the intuitive version failed: the "obviously brighter" candidate put blue and
-violet at delta-E 0.2 for protanopes, which is to say the same colour.
+Two validated palettes, and the dark one is not the light one inverted. Each was stepped
+against its own surface and checked at every pair for lightness band, chroma floor,
+colour-vision separation and contrast.
 
-The shipped dark set is three hues, `#00ab84 #6180e8 #c07f14`, checked at every pair
-against the panel surface for lightness band, chroma floor, colour-vision separation and
-contrast. Three, not four, because three is the most ever shown at once. Do not swap one
-without re-validating the whole set.
+| | Chart hues | Surface |
+|---|---|---|
+| Dark | `#00ab84` `#6180e8` `#c07f14` | `#10171c` |
+| Light | `#00997c` `#3a5ae0` `#b8730c` | `#fbfcfb` |
 
-Status colours are reserved and always ship with a text label, never colour alone.
+Dark was the one that needed real work. The intuitive version, take the light hues and
+brighten them, failed outright: it put blue and violet at delta-E 0.2 for protanopes,
+which is to say the same colour.
+
+Three slots in both themes, not four, because three is the most ever shown at once. Do
+not swap one without re-validating the whole set. Recharts takes colours as props rather
+than CSS variables, so `lib/chart.ts` re-derives the whole config when the theme flips.
+
+Glow is a dark-mode device; on a light ground it becomes haze, so `.glow-text` and
+`.glow-ring` fall back to a plain hairline. Status colours are reserved and always ship
+with a text label, never colour alone.
 
 ## Cost of the redesign
 

@@ -14,7 +14,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
-import { axis, CHART, grid, line, STATUS, tooltipStyle } from '../lib/chart'
+import { chartTheme } from '../lib/chart'
+import { useTheme } from '../lib/theme'
 import { compact, day, ms, pctLabel, stamp } from '../lib/format'
 
 type Data = {
@@ -36,6 +37,10 @@ const STATUS_COPY: Record<
 }
 
 export function Dashboard() {
+  const { theme } = useTheme()
+  // Recharts takes colours as props, not CSS variables, so the whole config is
+  // re-derived when the theme flips.
+  const { CHART, STATUS, axis, grid, line, tooltipStyle, barCursor } = chartTheme(theme)
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -220,7 +225,7 @@ export function Dashboard() {
                     <CartesianGrid {...grid} />
                     <XAxis dataKey="label" {...axis} />
                     <YAxis allowDecimals={false} {...axis} width={40} />
-                    <Tooltip {...tooltipStyle} cursor={{ fill: 'rgba(0,0,0,.03)' }}
+                    <Tooltip {...tooltipStyle} cursor={barCursor}
                              formatter={(v) => [String(v ?? 0), 'Questions']}
                              labelFormatter={(v) => `Score from ${v}`} />
                     <Bar dataKey="n" name="Questions" radius={[4, 4, 0, 0]} maxBarSize={38}>

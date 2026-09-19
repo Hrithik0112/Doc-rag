@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import { SplitFlapDisplay } from '@/components/ui/split-flap-display'
+import { chartTheme } from '@/lib/chart'
+import { useTheme } from '@/lib/theme'
 
 /** The headline band. Figures sit on the ambient field separated by hairlines
  *  rather than boxed into identical cards, so the lead number outranks the
@@ -32,7 +34,14 @@ export function Figure({
   lead?: boolean
   flip?: boolean
 }) {
-  const accent = { text: '#e6ecea', good: '#00b98d', critical: '#f06a5e', dim: '#8fa09b' }[tone]
+  const { theme } = useTheme()
+  const { STATUS } = chartTheme(theme)
+  const accent = {
+    text: theme === 'dark' ? '#e6ecea' : '#16202b',
+    good: STATUS.good,
+    critical: STATUS.critical,
+    dim: theme === 'dark' ? '#8fa09b' : '#55635f',
+  }[tone]
 
   return (
     <div className="relative bg-panel/70 px-5 py-4 backdrop-blur-xl">
