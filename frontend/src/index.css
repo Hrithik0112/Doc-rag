@@ -215,11 +215,14 @@
   }
   ::-webkit-scrollbar-thumb:hover { background: var(--halo); }
 
+  /* Gentler, not zero. Killing every transition also kills the colour and
+     opacity fades that aid comprehension; only movement has to stop. */
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation-duration: .01ms !important;
       animation-iteration-count: 1 !important;
-      transition-duration: .01ms !important;
+      transition-property: opacity, color, background-color, border-color !important;
+      transition-duration: 120ms !important;
     }
   }
 }
@@ -230,9 +233,15 @@
   /* glow is a dark-mode device; on a light ground it is just haze */
   :root[data-theme='light'] .glow-text { text-shadow: none; }
 
-  /* press feedback: the interface confirming it heard you */
-  .press { transition: transform 140ms var(--ease-snap); }
-  .press:active { transform: scale(0.97); }
+  /* Press feedback, deliberately asymmetric: the press snaps in, the release
+     settles. Matching both ends makes the button feel rubbery. */
+  .press { transition: transform 220ms var(--ease-snap); }
+  .press:active { transform: scale(0.97); transition-duration: 110ms; }
 }
 
 @keyframes blink { 50% { opacity: 0; } }
+
+/* citation marks arrive with the answer; opacity + transform only */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(4px); }
+}

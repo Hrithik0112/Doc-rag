@@ -5,3 +5,7 @@ __pycache__/
 node_modules/
 dist/
 backend/eval/corpus/*.pdf
+
+# agent skills: vendored 292K, reinstall with `npx skills add` from skills-lock.json
+.agents/
+.claude/skills/

@@ -148,7 +148,7 @@ export function Chat() {
             <button
               onClick={ask}
               disabled={!canAsk}
-              className="press rounded-md bg-glow px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-[0_0_26px_-6px_var(--accent)] transition-shadow hover:shadow-[0_0_34px_-4px_var(--accent)] disabled:cursor-not-allowed disabled:bg-raised disabled:text-faint disabled:shadow-none"
+              className="press rounded-md bg-glow px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-[0_0_26px_-6px_var(--accent)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:bg-raised disabled:text-faint disabled:shadow-none"
             >
               {busy ? 'Answering' : 'Ask'}
             </button>
