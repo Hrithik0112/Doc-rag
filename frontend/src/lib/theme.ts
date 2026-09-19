@@ -4,14 +4,9 @@ export type Theme = 'light' | 'dark'
 
 const KEY = 'papertrail-theme'
 
-/** One store, not one useState per caller.
- *
- * The obvious version -- a hook holding its own useState -- gives every
- * component a private copy. The toggle then updates its own copy and the DOM
- * attribute, and every other consumer keeps rendering the old theme forever.
- * Anything driven by a CSS variable still flips, so the bug hides: only the
- * things that take colour as a prop (the WebGL gradient, the Recharts config,
- * the split-flap) stay stuck, and only until the next full page load. */
+/** One store, not a useState per caller. Private copies leave every consumer
+ *  but the toggle rendering a stale theme, which only shows on the few things
+ *  taking colour as a prop rather than from a CSS variable. */
 const listeners = new Set<() => void>()
 
 const read = (): Theme =>
@@ -36,13 +31,12 @@ export function setTheme(next: Theme) {
   emit()
 }
 
-/** The theme is resolved and written to <html> by an inline script in
- *  index.html before first paint, so this reads it rather than deciding it. */
+// <html data-theme> is set pre-paint in index.html; this reads it, not decides it
 export function useTheme() {
   const theme = useSyncExternalStore(subscribe, read, () => 'dark' as Theme)
 
   useEffect(() => {
-    // follow the OS only while the user has expressed no preference
+    // follow the OS only until the user expresses a preference
     const mq = matchMedia('(prefers-color-scheme: light)')
     const onSystem = () => {
       if (localStorage.getItem(KEY)) return
@@ -60,9 +54,7 @@ export function useTheme() {
   return { theme, toggle }
 }
 
-/** WebGL animation runs on requestAnimationFrame, which a CSS
- *  prefers-reduced-motion rule cannot stop. Anything canvas-based has to check
- *  this itself and render something still instead. */
+/** rAF animation ignores the CSS reduced-motion rule, so canvases must ask. */
 export function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(
     () => matchMedia('(prefers-reduced-motion: reduce)').matches,

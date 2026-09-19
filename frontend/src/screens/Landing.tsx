@@ -4,9 +4,8 @@ import { getOverview, getRecentQueries, type Overview, type QueryRow } from '../
 import { compact } from '../lib/format'
 import { usePrefersReducedMotion, useTheme } from '../lib/theme'
 
-/** A worked example, used only when this instance has answered nothing yet. It
- *  is labelled as an example on screen, because a landing page for a tool about
- *  provenance should not pass invented output off as a real answer. */
+/** Fallback when nothing has been answered yet. Labelled as an example on
+ *  screen: a page about provenance must not pass invented output off as real. */
 const SAMPLE = {
   question: 'What optimizer was used, and with what beta values?',
   answer:
@@ -32,15 +31,14 @@ export function Landing() {
       .catch(() => {})
   }, [])
 
-  // Prefer something this instance actually answered over the scripted example.
+  // prefer a real answer over the scripted example
   const real = latest && {
     question: latest.question,
     answer: '',
     sources: latest.hits.slice(0, 3).map((h, i) => ({
       n: i + 1,
       where: `${h.filename}, page ${h.page}`,
-      // The query log records scores and page numbers but never passage text,
-      // so this shows what was actually stored rather than a plausible quote.
+      // the log stores no passage text, so show what it does store
       detail: `Fusion score ${h.score.toFixed(4)} · matched by ${h.arms
         .map((a) => (a === 'vector' ? 'meaning' : 'exact wording'))
         .join(' and ')}`,
@@ -48,11 +46,9 @@ export function Landing() {
   }
   const shown = real ?? SAMPLE
 
-  /* The landing page's own weather.
-     One motion, two palettes. Every shape and timing value is shared, so the
-     hero animates identically in both themes and only the colour changes. The
-     light ramp reaches further down into deep brass than the dark one reaches
-     up, because the same motion over three near-white tones is invisible. */
+  /* One motion, two palettes: every timing and shape value is shared, only the
+     colour changes. Light reaches further into deep brass than dark reaches up,
+     because the same swirl over three near-white tones is invisible. */
   const MOTION = {
     preset: 'custom' as const,
     rotation: -38,
@@ -96,8 +92,7 @@ export function Landing() {
           aria-hidden
         >
           {reducedMotion ? (
-            // A still gradient in the same colours, rather than a canvas
-            // looping forever for someone who asked it not to.
+            // still gradient rather than a canvas looping for someone who opted out
             <div
               className="size-full"
               style={{
@@ -134,13 +129,13 @@ export function Landing() {
           <div className="mt-11 flex flex-wrap items-center gap-3">
             <a
               href="#ask"
-              className="rounded-md bg-glow px-6 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+              className="press rounded-md bg-glow px-6 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
             >
               Ask a document
             </a>
             <a
               href="#instrumentation"
-              className="rounded-md border border-hair px-6 py-3 text-sm text-dim transition-colors hover:border-halo hover:text-text"
+              className="press rounded-md border border-hair px-6 py-3 text-sm text-dim transition-colors hover:border-halo hover:text-text"
             >
               See how well it works
             </a>

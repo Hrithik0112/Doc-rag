@@ -176,6 +176,12 @@
   --font-sans: 'Archivo', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
+  /* The built-in CSS easings are too weak to read as intentional. ease-in is
+     never used: it delays the first movement, which is the moment being
+     watched most closely. */
+  --ease-snap: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-move: cubic-bezier(0.77, 0, 0.175, 1);
+
   --radius-sm: 3px;
   --radius-md: 4px;
   --radius-lg: 8px;
@@ -219,34 +225,14 @@
 }
 
 @layer components {
-  /* One glass recipe, used deliberately. Panels that hold dense numbers get
-     the flat variant instead, because blur under small text costs legibility. */
-  .glass {
-    background: color-mix(in oklab, var(--panel) 72%, transparent);
-    backdrop-filter: blur(14px) saturate(120%);
-    border: 1px solid var(--hair);
-  }
-
-  /* Glow is a dark-mode device. On a light ground it turns into haze, so the
-     same classes fall back to a plain hairline and honest text. */
-  :root[data-theme='light'] .glow-text { text-shadow: none; }
-  :root[data-theme='light'] .glow-ring {
-    box-shadow: 0 1px 2px rgba(22, 32, 43, .06), 0 0 0 1px var(--hair);
-  }
-
   .glow-text { text-shadow: 0 0 28px color-mix(in oklab, currentColor 45%, transparent); }
 
-  .glow-ring {
-    box-shadow:
-      0 0 0 1px var(--hair),
-      0 0 34px -12px color-mix(in oklab, var(--accent) 60%, transparent);
-  }
+  /* glow is a dark-mode device; on a light ground it is just haze */
+  :root[data-theme='light'] .glow-text { text-shadow: none; }
 
-  /* hairline that fades at both ends, for section breaks */
-  .rule-fade {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--hair) 18%, var(--hair) 82%, transparent);
-  }
+  /* press feedback: the interface confirming it heard you */
+  .press { transition: transform 140ms var(--ease-snap); }
+  .press:active { transform: scale(0.97); }
 }
 
 @keyframes blink { 50% { opacity: 0; } }

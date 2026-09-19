@@ -57,6 +57,13 @@ Three screens: a landing page at `/`, `#ask`, and `#instrumentation`, reached fr
 nav bar. The working screens are flat and quiet. The landing page is the only one with
 weather.
 
+**Motion.** Two custom easing curves in `index.css`; the built-in CSS easings are too
+weak to read as intentional. `ease-in` is never used, because it delays the first movement,
+which is the moment being watched most closely. Buttons carry `.press`, a 140ms
+`scale(0.97)` on `:active`, so the interface visibly hears the click. Conventions follow
+[Emil Kowalski's design engineering skill](https://emilkowal.ski/skill)
+(`npx skills add emilkowalski/skill`).
+
 **Typography.** Three faces, one job each. `Instrument Serif` is display only, set large
 with tight tracking; it ships a single weight and a high-contrast cut that falls apart at
 body size. `Newsreader` is the reading surface, which is every answer and question.

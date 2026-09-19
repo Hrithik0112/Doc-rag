@@ -25,7 +25,7 @@ function ThemeToggle() {
       onClick={toggle}
       title={`Switch to ${next} mode`}
       aria-label={`Switch to ${next} mode`}
-      className="grid size-8 place-items-center rounded-md text-dim transition-colors hover:bg-raised hover:text-text"
+      className="press grid size-8 place-items-center rounded-md text-dim transition-colors hover:bg-raised hover:text-text"
     >
       {theme === 'dark' ? (
         <svg viewBox="0 0 24 24" className="size-[18px]" fill="none" aria-hidden>
@@ -44,8 +44,7 @@ function ThemeToggle() {
 }
 
 export default function App() {
-  // The hash is the router. Three screens do not justify a routing library, and
-  // this still gives each one a shareable, reloadable URL.
+  // hash routing: three screens do not justify a router, and URLs still work
   const [screen, setScreen] = useState<Screen>(read)
 
   useEffect(() => {

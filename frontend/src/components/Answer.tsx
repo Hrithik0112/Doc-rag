@@ -1,15 +1,15 @@
 import type { Source } from '../api'
 
-const BRACKET = /\[([^\][]+)\]/g
-// Every "Page 3" run inside one bracket. Models write [report.pdf, Page 1, Page 8],
-// so the filename is whatever precedes the FIRST page mark, not the last.
-const PAGES = /Pages?\s+([\d\s,–-]*\d)/gi
+// Built per call, not shared at module scope: matchAll honours a stale
+// lastIndex, so one shared /g regex would need resetting on every use.
+const bracketRe = () => /\[([^\][]+)\]/g
+// Models write [report.pdf, Page 1, Page 8], so the filename is whatever
+// precedes the FIRST page mark, not the last.
+const pagesRe = () => /Pages?\s+([\d\s,–-]*\d)/gi
 
 type Cite = { filename: string; page: number }
 
-// Academic PDFs carry inline LaTeX, so the model echoes "$L=6$" and
-// "\\text{P}_{\\text{drop}}" straight back. Unwrap rather than render: a math
-// engine is a large dependency for what is nearly always a symbol or two.
+// source PDFs carry LaTeX; unwrap it rather than ship a math engine
 const stripMath = (t: string) =>
   t
     .replace(/\$([^$\n]{1,120})\$/g, '$1')
@@ -17,9 +17,8 @@ const stripMath = (t: string) =>
     .replace(/_\{([^{}]*)\}/g, '$1')
     .replace(/\^\{([^{}]*)\}/g, '$1')
 
-export function parseCitations(inner: string): Cite[] {
-  PAGES.lastIndex = 0
-  const runs = [...inner.matchAll(PAGES)]
+function parseCitations(inner: string): Cite[] {
+  const runs = [...inner.matchAll(pagesRe())]
   if (!runs.length) return []
   const filename = inner.slice(0, runs[0].index).trim().replace(/,$/, '').trim()
   return runs.flatMap((r) =>
@@ -31,10 +30,9 @@ export function parseCitations(inner: string): Cite[] {
   )
 }
 
-/** Which margin mark a citation refers to. Unqualified citations match on page
- *  alone; qualified ones must match the filename too, so a page number from the
- *  wrong document does not quietly resolve to a right-looking mark. */
-export function markFor(sources: Source[], filename: string, page: number) {
+/** Qualified citations must match the filename too, so a page from the wrong
+ *  document cannot quietly resolve to a right-looking mark. */
+function markFor(sources: Source[], filename: string, page: number) {
   const i = sources.findIndex(
     (s) => s.page === page && (!filename || s.filename === filename),
   )
@@ -51,9 +49,8 @@ export function Answer({
   const text = stripMath(raw)
   const nodes: React.ReactNode[] = []
   let last = 0
-  BRACKET.lastIndex = 0
 
-  for (const m of text.matchAll(BRACKET)) {
+  for (const m of text.matchAll(bracketRe())) {
     const cites = parseCitations(m[1])
     if (!cites.length) continue // a bare [1] is a reference, not a citation
     nodes.push(text.slice(last, m.index))

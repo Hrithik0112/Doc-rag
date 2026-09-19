@@ -3,9 +3,7 @@ import { SplitFlapDisplay } from '@/components/ui/split-flap-display'
 import { chartTheme } from '@/lib/chart'
 import { useTheme } from '@/lib/theme'
 
-/** The headline band. Figures sit on the ambient field separated by hairlines
- *  rather than boxed into identical cards, so the lead number outranks the
- *  supporting ones instead of competing with them. */
+/** Hairlines rather than identical cards, so the lead figure outranks the rest. */
 export function Band({ children }: { children: ReactNode }) {
   return (
     <div className="grid grid-cols-4 gap-px overflow-hidden rounded-lg border border-hair/80 bg-hair/60 max-md:grid-cols-2">
@@ -21,9 +19,7 @@ const TONE = {
   dim: 'text-dim',
 } as const
 
-/** The lead figure flips like a departure board. It is the one moment of
- *  mechanical motion on the screen, reserved for the number that matters most;
- *  the supporting figures stay still so the movement keeps its meaning. */
+/** Only the lead figure flips, so the motion keeps its meaning. */
 export function Figure({
   label, value, note, tone = 'text', lead = false, flip = false,
 }: {
@@ -55,15 +51,13 @@ export function Figure({
 
       {flip ? (
         // columns must match the value or the board pads to its 14-cell default
-        // and runs straight out of the panel
         <div className="mt-2.5">
           <SplitFlapDisplay
             text={value.toUpperCase()}
             columns={value.length}
             size="md"
             accentColor={accent}
-            // the indicator strip is the only place accentColor lands, so it is
-            // what carries good-vs-critical on the lead figure
+            // the strip is the only place accentColor lands; it carries the tone
             showIndicators
             flipSpeed={34}
             staggerDelay={60}
@@ -76,7 +70,7 @@ export function Figure({
         </p>
       )}
 
-      {/* tone is never colour alone: the note spells out the ratio in words */}
+      {/* tone is never colour alone: the note spells the ratio out in words */}
       {note && (
         <p className={`mt-2 text-xs leading-snug ${lead && tone !== 'text' ? TONE[tone] : 'text-faint'}`}>
           {note}
@@ -86,8 +80,7 @@ export function Figure({
   )
 }
 
-/** A proportion as a thin bar rather than a pie. Each segment keeps a 2px gap
- *  so adjacent fills stay distinguishable without a border. */
+/** A bar, not a pie. 2px gaps keep adjacent fills apart without borders. */
 export function Meter({ parts }: { parts: { label: string; n: number; color: string }[] }) {
   const total = parts.reduce((s, p) => s + p.n, 0)
   if (!total) return <p className="text-xs text-faint">No data yet.</p>

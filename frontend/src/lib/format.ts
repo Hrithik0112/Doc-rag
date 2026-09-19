@@ -4,7 +4,7 @@ export const compact = (n: number) =>
   : n >= 1_000 ? `${(n / 1000).toFixed(1)}k`
   : String(n)
 
-export const pct = (num: number, den: number) =>
+const pct = (num: number, den: number) =>
   den === 0 ? null : (num / den) * 100
 
 /** One decimal only when it changes the reading. */

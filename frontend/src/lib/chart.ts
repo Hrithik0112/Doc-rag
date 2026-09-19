@@ -1,21 +1,12 @@
-/** Shared chart configuration.
- *
- * Two palettes, not one palette inverted. Each was stepped against its own
- * surface and checked at every pair for lightness band, chroma floor,
- * colour-vision separation and contrast. The dark set is emphatically not the
- * light set brightened: that candidate failed, putting blue and violet at
- * delta-E 0.2 for protanopes, i.e. the same colour.
- *
- * Three slots in both themes, because three is the most ever shown at once.
- * Do not swap one without re-validating the whole set. */
+/** Two validated palettes, not one inverted. Three slots because three is the
+ *  most ever shown at once. Re-validate the whole set before swapping one. */
 
 import type { Theme } from './theme'
 
 const PALETTES = {
   dark: {
     chart: ['#00a98a', '#7086ef', '#c2861c'],
-    // "warning" is the brass accent: an attention state, not a fourth hue that
-    // would need separating from the other three.
+    // warning is the accent: an attention state, not a fourth categorical hue
     status: { good: '#3fb389', warning: '#d6a447', critical: '#ef6f61' },
     text: '#e8e6e0',
     dim: '#97a0a8',
@@ -40,17 +31,13 @@ const PALETTES = {
   },
 } as const
 
-export type ChartTheme = ReturnType<typeof chartTheme>
-
 export function chartTheme(theme: Theme) {
   const p = PALETTES[theme]
   return {
     CHART: p.chart,
     STATUS: p.status,
-    ACCENT: p.accent,
 
-    /** Recessive axes and grid: furniture must stay quieter than data in both
-     *  themes, which means different values, not the same values. */
+    // recessive furniture: quieter than the data, per theme
     axis: {
       stroke: p.hair,
       tick: { fill: p.dim, fontSize: 11 },
@@ -73,8 +60,7 @@ export function chartTheme(theme: Theme) {
       cursor: { stroke: p.hair, strokeWidth: 1 },
     },
     barCursor: { fill: p.barCursor },
-    /** 2px strokes, 8px active dots, ringed in the surface colour so a marker
-     *  stays readable where it lands on its own line. */
+    // surface-ringed dots stay readable where a marker lands on its own line
     line: {
       strokeWidth: 2,
       dot: false,
