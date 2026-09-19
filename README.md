@@ -32,6 +32,25 @@ milliseconds and is 100% accurate. An approximate index would also fight the
 `document_id` filter and silently lose recall. `backend/add_index.sql` has the HNSW
 statement for when there is enough data to need it.
 
+## The instrumentation screen
+
+`#instrumentation` reads a query log written on every answered question. Everything on
+it comes from real traffic: grounding rate, token spend, latency percentiles, which
+retrieval arm actually found each passage, the fusion-score distribution, failures, and
+stored eval runs.
+
+Two things it is deliberately honest about:
+
+- **Embedding tokens are estimates.** The embed endpoint returns no usage metadata, so
+  that number comes from a local tokenizer and is labelled `est.` everywhere it appears.
+  Generation tokens are reported by the API and are exact.
+- **The grounding rate is not decorative.** If the model cites a page that was not
+  retrieved, the headline figure drops and turns red rather than rounding up to 100%.
+
+The log stores question text, retrieved page numbers and scores, but never passage
+contents. It has no retention policy, which is fine for a local single-user app and
+would need one before this ran for anyone else.
+
 ## Running it
 
 Requires Docker, Python 3.11+, Node 20+, and a Gemini API key from
@@ -47,6 +66,8 @@ python3 -m venv .venv
 
 cd frontend && npm install && npm run dev      # http://localhost:5173
 ```
+
+Two screens: `#ask` to question documents, `#instrumentation` for the dashboard.
 
 The schema is applied automatically on first boot.
 
@@ -70,10 +91,11 @@ Flash model and re-run the eval to see the difference.
 Each module carries one runnable check. No test framework.
 
 ```bash
-./.venv/bin/python -m backend.gemini      # 768 dims, L2-normalized, quota classifier
+./.venv/bin/python -m backend.gemini      # 768 dims, L2-normalized, quota classifier, usage
 ./.venv/bin/python -m backend.ingest      # chunk sizing, page scoping, overlap
 ./.venv/bin/python -m backend.citations   # citation parsing and verification
 ./.venv/bin/python -m backend.retrieval   # proves hybrid: exact string AND paraphrase
+./.venv/bin/python -m backend.stats       # arm buckets partition hits, no text copied
 ```
 
 `backend.retrieval` is the one that matters: it inserts a passage containing a rare
@@ -111,6 +133,20 @@ Answer quality (hybrid retrieval, graded by Gemini)
 The hybrid delta is one question, not a landslide. These are mostly
 paraphrase-friendly questions about two well-written papers; the gap widens on
 documents full of identifiers, part numbers and dates.
+
+## What the dashboard has already shown
+
+Nine seeded questions in, the keyword arm had contributed **zero** unique passages:
+every hit came either from vector search alone or from both arms agreeing. That is
+consistent with the eval's modest +1 delta, and it is exactly the kind of thing that
+stays invisible without instrumentation. It does not mean the keyword arm is dead code,
+`backend.retrieval` proves it fires on exact strings, it means these two papers rarely
+need it.
+
+The grounding rate also stopped being 100%. Asked "What optimizer was used and what were
+the beta values?", the model cited `attention.pdf, Page 13` when only page 7 of that
+document had been retrieved. The margin struck the citation through and the headline
+figure dropped to 88.9%. That is the feature working, not failing.
 
 ## Not built
 

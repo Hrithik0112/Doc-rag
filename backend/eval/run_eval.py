@@ -9,8 +9,10 @@ import asyncio
 import json
 import pathlib
 import sys
+import time
 
-from .. import citations, gemini, ingest, retrieval
+from .. import citations, gemini, ingest, retrieval, stats
+from ..config import CHAT_MODEL, EMBED_MODEL
 from ..db import pool
 
 HERE = pathlib.Path(__file__).parent
@@ -93,8 +95,18 @@ async def main():
     docs = await ensure_corpus()
     print(f"corpus: {', '.join(sorted(docs))}\nquestions: {len(QUESTIONS)}\n")
 
+    started = time.monotonic()
     base = await score(use_keyword=False, grade=False, docs=docs)
     full = await score(use_keyword=True, grade=not args.retrieval_only, docs=docs)
+    elapsed = int(time.monotonic() - started)
+
+    # persist so the dashboard can show quality as a trend, not a one-off number
+    await stats.save_eval_run(
+        embed_model=EMBED_MODEL, chat_model=CHAT_MODEL, n_questions=full["n"],
+        recall_hybrid=full["hit"], recall_vector=base["hit"], n_graded=full["graded"],
+        n_correct=full["correct"], n_partial=full["partial"],
+        n_citation_clean=full["clean"], duration_s=elapsed,
+    )
 
     k = retrieval.TOP_K
     print(f"Retrieval recall@{k}")

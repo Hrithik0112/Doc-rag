@@ -1,11 +1,11 @@
-import asyncio
 import json
+import time
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from . import citations, gemini, ingest, retrieval
+from . import citations, gemini, ingest, retrieval, stats
 from .db import pool
 from .ratelimit import limit
 
@@ -81,17 +81,31 @@ class Query(BaseModel):
 async def query(q: Query):
     if not q.question.strip():
         raise HTTPException(400, "Question is empty.")
-    hits = await retrieval.search(q.question, q.doc_ids, min(q.top_k, 20))
+
+    usage: dict = {}
+    t0 = time.monotonic()
+    try:
+        hits = await retrieval.search(q.question, q.doc_ids, min(q.top_k, 20), usage=usage)
+    except gemini.QuotaExceeded as e:
+        await stats.log_query(question=q.question, scope_doc_ids=q.doc_ids,
+                              status="quota", error=str(e), **usage)
+        raise HTTPException(429, f"Gemini quota exceeded while embedding the question: {e}")
+    retrieval_ms = int((time.monotonic() - t0) * 1000)
 
     async def stream():
         def sse(event, data):
             return f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
+
+        summary = stats.summarize_hits(hits)
 
         if not hits:
             yield sse("sources", [])
             yield sse("token", "I have no indexed passages to answer from. "
                                 "Upload a document, or wait for processing to finish.")
             yield sse("done", {"unverified_citations": []})
+            await stats.log_query(question=q.question, scope_doc_ids=q.doc_ids,
+                                  status="no_hits", retrieval_ms=retrieval_ms,
+                                  **summary, **usage)
             return
 
         multi = len({h["document_id"] for h in hits}) > 1 or q.doc_ids is None
@@ -105,15 +119,68 @@ async def query(q: Query):
             for h in hits])
 
         parts = []
+        g0 = time.monotonic()
         try:
-            async for tok in gemini.stream_answer(retrieval.build_prompt(q.question, hits, multi)):
+            async for tok in gemini.stream_answer(
+                retrieval.build_prompt(q.question, hits, multi), usage
+            ):
                 parts.append(tok)
                 yield sse("token", tok)
         except gemini.QuotaExceeded as e:
             yield sse("error", f"Gemini free-tier quota exceeded: {e}")
+            await stats.log_query(question=q.question, scope_doc_ids=q.doc_ids,
+                                  status="quota", error=str(e),
+                                  retrieval_ms=retrieval_ms,
+                                  generation_ms=int((time.monotonic() - g0) * 1000),
+                                  **summary, **usage)
+            return
+        except Exception as e:  # noqa: BLE001 -- the stream is already open
+            yield sse("error", f"Generation failed: {e}")
+            await stats.log_query(question=q.question, scope_doc_ids=q.doc_ids,
+                                  status="error", error=str(e),
+                                  retrieval_ms=retrieval_ms,
+                                  generation_ms=int((time.monotonic() - g0) * 1000),
+                                  **summary, **usage)
             return
 
-        yield sse("done", {"unverified_citations": citations.verify("".join(parts), hits)})
+        answer = "".join(parts)
+        unverified = citations.verify(answer, hits)
+        yield sse("done", {"unverified_citations": unverified})
+
+        await stats.log_query(
+            question=q.question, scope_doc_ids=q.doc_ids, status="ok",
+            retrieval_ms=retrieval_ms,
+            generation_ms=int((time.monotonic() - g0) * 1000),
+            n_citations=len(citations.parse(answer)), n_unverified=len(unverified),
+            **summary, **usage,
+        )
 
     return StreamingResponse(stream(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+# ── dashboard ────────────────────────────────────────────────────────────
+
+@router.get("/stats/overview")
+async def stats_overview():
+    return await stats.overview()
+
+
+@router.get("/stats/timeseries")
+async def stats_timeseries(days: int = 14):
+    return await stats.timeseries(max(1, min(days, 90)))
+
+
+@router.get("/stats/queries")
+async def stats_queries(limit: int = 25):
+    return await stats.recent_queries(limit)
+
+
+@router.get("/stats/scores")
+async def stats_scores():
+    return await stats.score_buckets()
+
+
+@router.get("/stats/evals")
+async def stats_evals():
+    return await stats.eval_runs()

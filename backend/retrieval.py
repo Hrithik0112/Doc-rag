@@ -43,10 +43,10 @@ LIMIT $5
 
 
 async def search(question: str, doc_ids: list[str] | None = None, top_k: int = TOP_K,
-                 use_keyword: bool = True) -> list[dict]:
+                 use_keyword: bool = True, usage: dict | None = None) -> list[dict]:
     """doc_ids=None searches the whole corpus. use_keyword=False gives the
     vector-only baseline the eval harness compares against."""
-    qvec = (await gemini.embed([question], gemini.QUERY))[0]
+    qvec = (await gemini.embed([question], gemini.QUERY, usage))[0]
     p = await pool()
     async with p.acquire() as conn:
         rows = await conn.fetch(
