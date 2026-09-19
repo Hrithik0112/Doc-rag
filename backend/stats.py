@@ -5,8 +5,12 @@ one estimated number (embedding tokens) keeps "_est" in its name all the way to
 the UI, because the embed endpoint reports no usage."""
 
 import json
+import logging
 
+from . import obs
 from .config import CHAT_MODEL, EMBED_MODEL
+
+_log = obs.log("papertrail.stats")
 from .db import pool
 
 
@@ -21,8 +25,11 @@ async def log_query(**f) -> None:
                      n_vector_only, n_keyword_only, n_both_arms,
                      n_citations, n_unverified,
                      prompt_tokens, completion_tokens, embed_tokens_est,
-                     retrieval_ms, generation_ms)
-                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)""",
+                     retrieval_ms, generation_ms,
+                     request_id, trace_id, error_kind, embed_ms, search_ms, verify_ms,
+                     retries, throttle_ms, est_cost_usd)
+                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
+                           $18,$19,$20,$21,$22,$23,$24,$25,$26)""",
                 f["question"][:4000], f.get("scope_doc_ids"), f.get("status", "ok"),
                 (f.get("error") or None) and str(f["error"])[:2000],
                 f.get("n_hits", 0), f.get("top_score"), json.dumps(f.get("hits", [])),
@@ -31,9 +38,21 @@ async def log_query(**f) -> None:
                 f.get("prompt_tokens", 0), f.get("completion_tokens", 0),
                 f.get("embed_tokens_est", 0),
                 f.get("retrieval_ms", 0), f.get("generation_ms", 0),
+                obs.request_id.get(), f.get("trace_id"), f.get("error_kind"),
+                f.get("embed_ms", 0), f.get("search_ms", 0), f.get("verify_ms", 0),
+                f.get("retries", 0), f.get("throttle_ms", 0),
+                obs.estimate_cost(
+                    prompt=f.get("prompt_tokens", 0),
+                    completion=f.get("completion_tokens", 0),
+                    embed=f.get("embed_tokens_est", 0),
+                ),
             )
-    except Exception:  # noqa: BLE001 -- logging must never surface to the caller
-        pass
+    except Exception as e:  # noqa: BLE001
+        # Must not surface to a caller who already has their answer, but
+        # swallowing it silently means the dashboard goes blank and nothing
+        # says why. Log it loudly instead.
+        obs.event(_log, logging.ERROR, "query log write failed",
+                  error_kind=obs.classify(e), error=str(e)[:300])
 
 
 def _arm_counts(hits: list[dict]) -> dict:
@@ -94,7 +113,18 @@ SELECT
      FROM queries WHERE status='ok')                                AS generation_ms_p95,
   (SELECT coalesce(sum(n_vector_only),0)  FROM queries)             AS hits_vector_only,
   (SELECT coalesce(sum(n_keyword_only),0) FROM queries)             AS hits_keyword_only,
-  (SELECT coalesce(sum(n_both_arms),0)    FROM queries)             AS hits_both_arms
+  (SELECT coalesce(sum(n_both_arms),0)    FROM queries)             AS hits_both_arms,
+  (SELECT coalesce(sum(est_cost_usd),0) FROM queries)               AS query_cost_usd,
+  (SELECT coalesce(sum(est_cost_usd),0) FROM documents)             AS ingest_cost_usd,
+  (SELECT coalesce(sum(retries),0)  FROM queries)                   AS retries,
+  (SELECT coalesce(sum(throttle_ms),0) FROM queries)                AS throttle_ms,
+  -- rows written before stage timing existed carry 0 and would drag the
+  -- median to nothing, so only rows that actually measured it count
+  (SELECT percentile_disc(0.5) WITHIN GROUP (ORDER BY embed_ms)
+     FROM queries WHERE status='ok' AND embed_ms > 0)               AS embed_ms_p50,
+  (SELECT percentile_disc(0.5) WITHIN GROUP (ORDER BY search_ms)
+     FROM queries WHERE status='ok' AND search_ms > 0)              AS search_ms_p50,
+  (SELECT count(*) FROM queries WHERE embed_ms > 0)                 AS n_staged
 """
 
 
@@ -103,6 +133,8 @@ async def overview() -> dict:
     async with p.acquire() as conn:
         row = await conn.fetchrow(_OVERVIEW)
     d = dict(row)
+    for k in ("query_cost_usd", "ingest_cost_usd"):
+        d[k] = float(d[k])
     d["embed_model"] = EMBED_MODEL
     d["chat_model"] = CHAT_MODEL
     return d
@@ -143,11 +175,15 @@ async def recent_queries(limit: int = 25) -> list[dict]:
                       n_citations, n_unverified,
                       prompt_tokens, completion_tokens, embed_tokens_est,
                       retrieval_ms, generation_ms, created_at,
-                      scope_doc_ids IS NULL AS corpus_wide
+                      scope_doc_ids IS NULL AS corpus_wide,
+                      request_id, error_kind::text AS error_kind,
+                      embed_ms, search_ms, verify_ms, retries, throttle_ms,
+                      est_cost_usd
                FROM queries ORDER BY created_at DESC LIMIT $1""",
             min(limit, 200),
         )
-    return [{**dict(r), "hits": json.loads(r["hits"])} for r in rows]
+    return [{**dict(r), "hits": json.loads(r["hits"]),
+             "est_cost_usd": float(r["est_cost_usd"])} for r in rows]
 
 
 async def score_buckets() -> list[dict]:
@@ -163,6 +199,26 @@ async def score_buckets() -> list[dict]:
     by = {r["bucket"]: r["n"] for r in rows}
     return [{"bucket": i, "floor": round((i - 1) * 0.005, 4),
              "ceiling": round(i * 0.005, 4), "n": by.get(i, 0)} for i in range(1, 10)]
+
+
+async def error_breakdown() -> list[dict]:
+    """Counting failures is the whole point of the taxonomy; a free-text column
+    could not have produced this."""
+    p = await pool()
+    async with p.acquire() as conn:
+        rows = await conn.fetch(
+            """SELECT kind::text AS kind,
+                      count(*) FILTER (WHERE src='query')    AS queries,
+                      count(*) FILTER (WHERE src='document') AS documents
+               FROM (
+                 SELECT error_kind AS kind, 'query' AS src FROM queries
+                   WHERE error_kind IS NOT NULL
+                 UNION ALL
+                 SELECT error_kind, 'document' FROM documents
+                   WHERE error_kind IS NOT NULL
+               ) t GROUP BY kind ORDER BY 2 DESC, 3 DESC"""
+        )
+    return [dict(r) for r in rows]
 
 
 async def eval_runs(limit: int = 20) -> list[dict]:
@@ -189,6 +245,22 @@ async def save_eval_run(**f) -> None:
         )
 
 
+async def _sql_check():
+    """Executes every read against the real database. The pure-logic checks
+    below cannot catch a malformed query, which is exactly the bug that got
+    through twice."""
+    for name, fn in (
+        ("overview", overview), ("timeseries", lambda: timeseries(7)),
+        ("recent_queries", lambda: recent_queries(1)), ("score_buckets", score_buckets),
+        ("eval_runs", eval_runs), ("error_breakdown", error_breakdown),
+    ):
+        try:
+            await fn()
+        except Exception as e:  # noqa: BLE001
+            raise AssertionError(f"{name} query is broken: {e}") from e
+    print("ok  stats: all 6 dashboard reads execute against Postgres")
+
+
 def _self_check():
     hits = [
         {"page_num": 3, "filename": "a.pdf", "score": 0.031, "vec_rank": 1, "kw_rank": 1},
@@ -212,4 +284,7 @@ def _self_check():
 
 
 if __name__ == "__main__":
+    import asyncio
+
     _self_check()
+    asyncio.run(_sql_check())

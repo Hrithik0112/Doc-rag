@@ -24,3 +24,19 @@ export const stamp = (iso: string) =>
   new Date(iso).toLocaleString(undefined, {
     month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
   })
+
+/** Free-tier spend is zero. This is what the traffic WOULD cost on the paid
+ *  tier, so it is never rendered without that qualifier beside it. */
+export const usd = (v: number) =>
+  v === 0 ? '$0' : v < 0.01 ? `$${v.toFixed(4)}` : `$${v.toFixed(2)}`
+
+export const ERROR_KIND_LABEL: Record<string, string> = {
+  quota_daily: 'Daily quota',
+  quota_per_minute: 'Per-minute quota',
+  upstream: 'Upstream 5xx',
+  timeout: 'Timeout',
+  no_extractable_text: 'No text to extract',
+  bad_input: 'Bad input',
+  database: 'Database',
+  unknown: 'Unclassified',
+}

@@ -32,6 +32,37 @@ milliseconds and is 100% accurate. An approximate index would also fight the
 `document_id` filter and silently lose recall. `backend/add_index.sql` has the HNSW
 statement for when there is enough data to need it.
 
+## Observability
+
+Every signal is emitted once in `backend/obs.py` and lands in four places: the structured
+log, an OpenTelemetry span, a Prometheus counter, and the row the dashboard reads.
+Anything reported in only one of those is a blind spot.
+
+**Structured logs.** JSON on stdout, one line per event, carrying a `request_id` that also
+comes back on every response as `X-Request-Id`, so a dashboard row ties to what actually
+happened. `LOG_FORMAT=text` for a readable terminal.
+
+**Error taxonomy.** Eight buckets (`backend/obs.py`), because free-text error strings
+cannot be counted, alerted on, or compared across releases. `classify()` has a self-check;
+the dashboard groups failures by bucket.
+
+**Stage timing.** `retrieval_ms` used to bundle the Gemini embed round trip with the
+Postgres query. Split, the first measurement said 568ms embedding against 19ms search:
+retrieval was 97% network. Throttle waits are tracked separately again, because time spent
+in our own rate limiter is self-inflicted and should never be mistaken for a slow API.
+
+**Cost.** Paid-tier list prices, tracked per query and per document. We run on the free
+tier, so real spend is $0 and every surface says so: the column is `est_cost_usd` and the
+panel reads "what this traffic would cost".
+
+**Metrics.** `GET /metrics` in Prometheus format. **Tracing** exports over OTLP only when
+`OTEL_EXPORTER_OTLP_ENDPOINT` is set; without a collector the SDK would retry a dead
+endpoint on every span, so it stays off and the in-process spans still drive the
+histograms.
+
+**Health.** `GET /api/health` checks the database and the quota gauge and returns 503 when
+either is unhappy. A health check that cannot fail tells you nothing.
+
 ## The instrumentation screen
 
 `#instrumentation` reads a query log written on every answered question. Everything on
@@ -174,8 +205,13 @@ Each module carries one runnable check. No test framework.
 ./.venv/bin/python -m backend.ingest      # chunk sizing, page scoping, overlap
 ./.venv/bin/python -m backend.citations   # citation parsing and verification
 ./.venv/bin/python -m backend.retrieval   # proves hybrid: exact string AND paraphrase
-./.venv/bin/python -m backend.stats       # arm buckets partition hits, no text copied
+./.venv/bin/python -m backend.stats       # arm buckets, AND all 6 dashboard reads execute
+./.venv/bin/python -m backend.obs         # error taxonomy, cost, spans, JSON log
 ```
+
+`backend.stats` runs every dashboard query against Postgres. Its earlier version only
+tested pure logic, which is how two SQL syntax errors reached a running server; both were
+caught within seconds by the logging added here, but the check now catches them first.
 
 `backend.retrieval` is the one that matters: it inserts a passage containing a rare
 exact string and asserts both that keyword search retrieves it and that a paraphrased

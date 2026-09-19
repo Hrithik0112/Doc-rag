@@ -6,14 +6,17 @@ so a quota failure mid-document costs nothing and never redoes work.
 """
 
 import asyncio
+import logging
 import re
 import time
 
 import pymupdf
 import tiktoken
 
-from . import gemini
+from . import gemini, obs
 from .db import pool
+
+_log = obs.log("papertrail.ingest")
 
 _enc = tiktoken.get_encoding("cl100k_base")
 
@@ -53,23 +56,30 @@ def chunk_pages(pages: list[str]) -> list[tuple[int, str]]:
 
 
 async def create_document(filename: str, pdf_bytes: bytes) -> str:
-    pages = extract_pages(pdf_bytes)
-    chunks = chunk_pages(pages)
+    with obs.span("parse", filename=filename) as parse_took:
+        pages = extract_pages(pdf_bytes)
+    with obs.span("chunk") as chunk_took:
+        chunks = chunk_pages(pages)
+    obs.INGEST_SECONDS.labels(stage="parse").observe(parse_took["ms"] / 1000)
+    obs.INGEST_SECONDS.labels(stage="chunk").observe(chunk_took["ms"] / 1000)
     if not chunks:
         raise ValueError("No extractable text. Scanned PDFs need OCR, which is not built.")
 
     p = await pool()
     async with p.acquire() as conn, conn.transaction():
         doc_id = await conn.fetchval(
-            "INSERT INTO documents (filename, status, n_pages, n_chunks) "
-            "VALUES ($1,'pending',$2,$3) RETURNING id",
-            filename, len(pages), len(chunks),
+            "INSERT INTO documents (filename, status, n_pages, n_chunks, parse_ms, chunk_ms) "
+            "VALUES ($1,'pending',$2,$3,$4,$5) RETURNING id",
+            filename, len(pages), len(chunks), parse_took["ms"], chunk_took["ms"],
         )
         await conn.executemany(
             "INSERT INTO chunks (document_id, chunk_idx, page_num, content) "
             "VALUES ($1,$2,$3,$4)",
             [(doc_id, i, pg, txt) for i, (pg, txt) in enumerate(chunks)],
         )
+    obs.event(_log, logging.INFO, "document accepted", document_id=str(doc_id),
+              filename=filename, pages=len(pages), chunks=len(chunks),
+              parse_ms=parse_took["ms"], chunk_ms=chunk_took["ms"])
     return str(doc_id)
 
 
@@ -82,6 +92,7 @@ async def embed_pending(doc_id: str):
             "UPDATE documents SET status='processing', error=NULL WHERE id=$1", doc_id
         )
     usage: dict = {}
+    spent = 0.0  # accumulated across batches; usage is drained each round
     started = time.monotonic()
     try:
         while True:
@@ -95,9 +106,13 @@ async def embed_pending(doc_id: str):
             if not rows:
                 break
 
-            vectors = await gemini.embed(
-                [r["content"] for r in rows], gemini.DOCUMENT, usage
-            )
+            with obs.span("embed_batch", chunks=len(rows)) as batch_took:
+                vectors = await gemini.embed(
+                    [r["content"] for r in rows], gemini.DOCUMENT, usage
+                )
+            obs.INGEST_SECONDS.labels(stage="embed").observe(batch_took["ms"] / 1000)
+            batch_tokens = usage.pop("embed_tokens_est", 0)
+            spent += obs.estimate_cost(embed=batch_tokens)
 
             async with p.acquire() as conn, conn.transaction():
                 await conn.executemany(
@@ -112,20 +127,31 @@ async def embed_pending(doc_id: str):
                     "  indexed_ms = indexed_ms + $3 "
                     "WHERE id=$1",
                     doc_id,
-                    usage.pop("embed_tokens_est", 0),
+                    batch_tokens,
                     int((time.monotonic() - started) * 1000),
                 )
                 started = time.monotonic()
 
         async with p.acquire() as conn:
-            await conn.execute("UPDATE documents SET status='ready' WHERE id=$1", doc_id)
+            await conn.execute(
+                "UPDATE documents SET status='ready', error=NULL, error_kind=NULL, "
+                "embed_retries=$2, throttle_ms=$3, "
+                "est_cost_usd = est_cost_usd + $4 WHERE id=$1",
+                doc_id, usage.get("retries", 0), usage.get("throttle_ms", 0), spent,
+            )
+        obs.event(_log, logging.INFO, "document indexed", document_id=doc_id,
+                  retries=usage.get("retries", 0),
+                  throttle_ms=usage.get("throttle_ms", 0))
 
     except Exception as e:
-        kind = "quota" if isinstance(e, gemini.QuotaExceeded) else "error"
+        kind = obs.classify(e)
+        obs.event(_log, logging.ERROR, "ingestion stopped", document_id=doc_id,
+                  error_kind=kind, error=str(e)[:300],
+                  retries=usage.get("retries", 0))
         async with p.acquire() as conn:
             await conn.execute(
-                "UPDATE documents SET status='failed', error=$2 WHERE id=$1",
-                doc_id, f"{kind}: {e}"[:2000],
+                "UPDATE documents SET status='failed', error=$2, error_kind=$3 WHERE id=$1",
+                doc_id, str(e)[:2000], kind,
             )
 
 
